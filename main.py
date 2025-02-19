@@ -3,13 +3,18 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
+import locale
+locale.setlocale(locale.LC_ALL, '')  # set to system default locale
 
 # Import helper functions from utils.py
 from utils import (
     simulate_ev_station, run_monte_carlo, 
-    simulate_grid_only, simulate_solar_only, simulate_solar_with_storage,
+    simulate_grid_only, simulate_solar_system,
     annualize_results, compute_roi, solar_irradiance, get_electricity_rate, solar_production
 )
+from localization import UI_TEXTS
+from constants import CHARGING_STATION_PRICE, TRANSFORMER_PRICE, SOLAR_PANEL_PRICE, INVERTER_PRICE, INSTALLATION_PRICE, BATTERY_PACK_PRICE
+
 
 # Include the tooltip CSS (only needs to be added once per page)
 tooltip_css = """
@@ -55,164 +60,209 @@ tooltip_css = """
 </style>
 """
 st.markdown(tooltip_css, unsafe_allow_html=True)
+# In your sidebar, add a language selector
+language = st.sidebar.selectbox("Select Language", options=["EN", "VI"])
+# Define UI text dictionaries for English and Vietnamese
+texts = UI_TEXTS[language]
+# Add a local currency exchange rate input.
+# For Vietnamese UI, assume an exchange rate from USD to VND.
+if language == "VI":
+    local_exchange_rate = st.sidebar.number_input("Tỷ giá USD sang VND", value=25500.0)
+    currency_symbol = "₫"
+else:
+    local_exchange_rate = 1.0  # No conversion if using USD
+    currency_symbol = "$"
+
+# Helper function to format currency using the specified exchange rate.
+def format_currency(amount, exchange_rate, symbol):
+    # Multiply by the exchange rate
+    local_value = amount * exchange_rate
+    # Format with grouping for thousands, using system locale
+    formatted_value = locale.format_string("%.2f", local_value, grouping=True)
+    return f"{symbol}{formatted_value}"
 
 def main_ui():
-    st.title("EV Charging Station Cost, Solar & ROI Simulation")
-    st.markdown("""
-    This tool simulates the cost-effectiveness of an EV charging station under various configurations.
-    
-    **Features include:**
-    - Detailed simulation with solar production, battery integration, and grid tariffs.
-    - A Solar Report for Buon Ma Thuot, Vietnam.
-    - ROI analysis across different design configurations.
-    - Explanations of the underlying math and formulas via hover-help.
-    """)
+        
+    st.title(texts["title"])
+
+    st.markdown(texts["description"])
 
     # ---------------------------
-    # Consolidated Sidebar Inputs
+    # Left Sidebar: Collapsible Sections for Different Settings
     # ---------------------------
-    st.sidebar.header("Simulation Settings")
-    simulation_days = st.sidebar.number_input(
-        "Simulation Duration (Days) ", value=30,
-        help="The number of days to simulate (affects depreciation and energy totals)."
-    )
-    charging_sessions_per_day = st.sidebar.slider(
-        "Average Charging Sessions per Day ", 0, 48, 12,
-        help="Each session delivers (Charging Power x 0.5 hr) kWh."
-    )
-    num_stations = st.sidebar.number_input(
-        "Number of charging station:", 1, 1000,1,
-        help="Number of charging stations or ports."
-    )
-    charging_station_power = st.sidebar.number_input(
-        "Charging Station Power (kW) ", value=30,
-        help="Rated power of each charging station."
-    )
-    
-    charging_price = st.sidebar.number_input(
-        "Charging Price ($/kWh) ", value=0.17,
-        help="Price charged to EV customers per kWh."
-    )
 
-    use_battery = st.sidebar.checkbox(
-        "Use Battery ", value=True,
-        help="Enable battery integration for load management."
-    )
+    # Simulation Settings
+    with st.sidebar.expander(texts["sidebar"]["simulation_settings"], expanded=True):
+        simulation_days = st.number_input(
+            texts["sidebar"]["simulation_duration"],
+            value=30,
+            help=texts["sidebar"]["simulation_duration_help"]
+        )
+        charging_sessions_per_day = st.slider(
+            texts["sidebar"]["average_charging_sessions"],
+            0, 48, 12,
+            help=texts["sidebar"]["average_charging_sessions_help"]
+        )
+        num_stations = st.number_input(
+            texts["sidebar"]["num_stations"],
+            1, 100, 1,
+            help=texts["sidebar"]["num_stations_help"]
+        )
+        charging_station_power = st.number_input(
+            texts["sidebar"]["charging_station_power"],
+            value=30,
+            help=texts["sidebar"]["charging_station_power_help"]
+        )
+        charging_price = st.number_input(
+            texts["sidebar"]["charging_price"],
+            value=0.17,
+            help=texts["sidebar"]["charging_price_help"]
+        )
+        use_battery = st.checkbox(
+            texts["sidebar"]["use_battery"],
+            value=True,
+            help=texts["sidebar"]["use_battery_help"]
+        )
 
-    st.sidebar.header("Solar Settings")
-    solar_capacity = st.sidebar.number_input(
-        "Solar Panel Capacity (kW) ", value=20,
-        help="Installed capacity of the solar panels."
-    )
-    solar_randomness = st.sidebar.slider(
-        "Solar Variability (Fraction) ", 0.0, 0.5, 0.1, step=0.01,
-        help="Represents variability in solar output (e.g., due to clouds)."
-    )
+    # Solar Settings
+    with st.sidebar.expander("Solar Settings", expanded=False):
+        solar_capacity = st.number_input(
+            texts["sidebar"]["solar_panel_capacity"],
+            value=20,
+            help=texts["sidebar"]["solar_panel_capacity_help"]
+        )
+        solar_randomness = st.slider(
+            texts["sidebar"]["solar_variability"],
+            0.0, 0.5, 0.1, step=0.01,
+            help=texts["sidebar"]["solar_variability_help"]
+        )
 
+    # Battery Pack Configuration (only if battery is used)
     if use_battery:
-        st.sidebar.subheader("Battery Pack Configuration")
-        battery_pack_Ah = st.sidebar.number_input(
-            "Battery Pack Capacity (Ah) ", value=100,
-            help="Capacity of one battery pack in Ampere-hours."
-        )
-        battery_pack_voltage = st.sidebar.number_input(
-            "Battery Pack Voltage (V) ", value=51.2,
-            help="Voltage of one battery pack."
-        )
-        battery_pack_price = st.sidebar.number_input(
-            "Battery Pack Price ($) ", value=1000,
-            help="Cost per battery pack."
-        )
-        number_of_battery_packs = st.sidebar.slider(
-            "Number of Battery Packs Installed ", 1, 20, 4,
-            help="Total number of battery packs installed."
-        )
-        initial_soc_fraction = st.sidebar.slider(
-            "Initial Battery SoC (Fraction) ", 0.0, 1.0, 0.5,
-            help="Initial state-of-charge as a fraction of total battery capacity."
-        )
-        battery_max_charge_power = st.sidebar.slider(
-            "Battery Max Charge/Discharge Rate (C) ", 0.0, 1.0, 0.5,
-            help="Maximum charging rate as a fraction of battery capacity (e.g., 0.5 means the battery can be charged/discharged at 50% of its capacity per hour)."
-        )
-
-
+        with st.sidebar.expander(texts["sidebar"]["battery_pack_configuration"], expanded=False):
+            battery_pack_Ah = st.number_input(
+                texts["sidebar"]["battery_pack_capacity"],
+                value=100,
+                help=texts["sidebar"]["battery_pack_capacity_help"]
+            )
+            battery_pack_voltage = st.number_input(
+                texts["sidebar"]["battery_pack_voltage"],
+                value=51.2,
+                help=texts["sidebar"]["battery_pack_voltage_help"]
+            )
+            battery_pack_price = st.number_input(
+                texts["sidebar"]["battery_pack_price"],
+                value=1000,
+                help=texts["sidebar"]["battery_pack_price_help"]
+            )
+            number_of_battery_packs = st.slider(
+                texts["sidebar"]["num_battery_packs"],
+                1, 20, 4,
+                help=texts["sidebar"]["num_battery_packs_help"]
+            )
+            initial_soc_fraction = st.slider(
+                texts["sidebar"]["initial_battery_soc"],
+                0.0, 1.0, 0.5,
+                help=texts["sidebar"]["initial_battery_soc_help"]
+            )
+            battery_max_charge_power = st.slider(
+                texts["sidebar"]["battery_max_charge_rate"],
+                0.0, 1.0, 0.5,
+                help=texts["sidebar"]["battery_max_charge_rate_help"]
+            )
     else:
         battery_pack_Ah = battery_pack_voltage = battery_pack_price = number_of_battery_packs = 0
         initial_soc_fraction = 0.0
 
-    st.sidebar.header("Battery & Inverter Performance")
-    battery_efficiency = st.sidebar.slider(
-        "Battery Round-Trip Efficiency ", 0.5, 1.0, 0.9, step=0.01,
-        help="Efficiency during a full charge/discharge cycle."
-    )
-    inverter_efficiency = st.sidebar.slider(
-        "Inverter Efficiency ", 0.5, 1.0, 0.95, step=0.01,
-        help="Efficiency of converting DC (solar) to AC when charging the battery."
-    )
-    battery_degradation_cost = st.sidebar.number_input(
-        "Battery Degradation Cost ($/kWh discharged) ", value=0.05,
-        help="Cost associated with battery wear per kWh discharged."
-    )
-    battery_usage_threshold = st.sidebar.number_input(
-        "Grid Price Threshold for Battery Use ($/kWh) ", value=0.17,
-        help="If the grid tariff exceeds this value, battery discharge is used."
-    )
+    # Battery & Inverter Performance
+    with st.sidebar.expander(texts["sidebar"]["battery_inverter_performance"], expanded=False):
+        battery_efficiency = st.slider(
+            texts["sidebar"]["battery_round_trip_efficiency"],
+            0.5, 1.0, 0.9, step=0.01,
+            help=texts["sidebar"]["battery_round_trip_efficiency_help"]
+        )
+        inverter_efficiency = st.slider(
+            texts["sidebar"]["inverter_efficiency"],
+            0.5, 1.0, 0.95, step=0.01,
+            help=texts["sidebar"]["inverter_efficiency_help"]
+        )
+        battery_degradation_cost = st.number_input(
+            texts["sidebar"]["battery_degradation_cost"],
+            value=0.05,
+            help=texts["sidebar"]["battery_degradation_cost_help"]
+        )
+        battery_usage_threshold = st.number_input(
+            texts["sidebar"]["grid_price_threshold"],
+            value=0.17,
+            help=texts["sidebar"]["grid_price_threshold_help"]
+        )
 
-    st.sidebar.header("Capital Costs & Lifetimes")
-    initial_costs = {
-        "charging_station": st.sidebar.number_input(
-            "Charging Station Cost ($) ", value=7000,
-            help="Capital cost for the charging station."
-        ),
-        "transformer": st.sidebar.number_input(
-            "Transformer Cost ($) ", value=1000,
-            help="Cost of any required transformer."
-        ),
-        "solar_panel": st.sidebar.number_input(
-            "Solar Panel Cost ($) ", value=2000,
-            help="Cost for solar panel installation."
-        ),
-        "inverter": st.sidebar.number_input(
-            "Inverter Cost ($) ", value=3000,
-            help="Cost of the inverter (use lower cost if battery not used)."
-        ),
-        "installation": st.sidebar.number_input(
-            "Installation & Other Costs ($) ", value=1000,
-            help="Other installation-related costs."
+    # Capital Costs & Lifetimes
+    with st.sidebar.expander(texts["sidebar"]["capital_costs_lifetimes"], expanded=False):
+        charging_station_cost = st.number_input(
+            texts["sidebar"]["charging_station_cost"],
+            value=7000,
+            help=texts["sidebar"]["charging_station_cost_help"]
         )
-    }
-    component_lifetime_years = {
-        "charging_station": st.sidebar.number_input(
-            "Charging Station Lifetime (Years) ", value=10,
-            help="Expected lifetime of the charging station."
-        ),
-        "transformer": st.sidebar.number_input(
-            "Transformer Lifetime (Years) ", value=15,
-            help="Expected lifetime of the transformer."
-        ),
-        "solar_panel": st.sidebar.number_input(
-            "Solar Panel Lifetime (Years) ", value=25,
-            help="Expected lifetime of the solar panels."
-        ),
-        "battery": st.sidebar.number_input(
-            "Battery Lifetime (Years) ", value=10,
-            help="Expected lifetime of the battery system."
-        ),
-        "inverter": st.sidebar.number_input(
-            "Inverter Lifetime (Years) ", value=10,
-            help="Expected lifetime of the inverter."
-        ),
-        "installation": st.sidebar.number_input(
-            "Installation Lifetime (Years) ", value=10,
-            help="Lifetime over which installation costs are amortized."
+        transformer_cost = st.number_input(
+            texts["sidebar"]["transformer_cost"],
+            value=1000,
+            help=texts["sidebar"]["transformer_cost_help"]
         )
-    }
-    st.sidebar.header("Monte Carlo Simulation")
-    monte_iterations = st.sidebar.number_input(
-        "Monte Carlo Iterations ", 1, 200, 50,
-        help="Number of iterations for Monte Carlo simulation."
-    )
+        solar_panel_cost = st.number_input(
+            texts["sidebar"]["solar_panel_cost"],
+            value=2000,
+            help=texts["sidebar"]["solar_panel_cost_help"]
+        )
+        inverter_cost = st.number_input(
+            texts["sidebar"]["inverter_cost"],
+            value=3000,
+            help=texts["sidebar"]["inverter_cost_help"]
+        )
+        installation_cost = st.number_input(
+            texts["sidebar"]["installation_cost"],
+            value=1000,
+            help=texts["sidebar"]["installation_cost_help"]
+        )
+        charging_station_lifetime = st.number_input(
+            texts["sidebar"]["charging_station_lifetime"],
+            value=10,
+            help=texts["sidebar"]["charging_station_lifetime_help"]
+        )
+        transformer_lifetime = st.number_input(
+            texts["sidebar"]["transformer_lifetime"],
+            value=15,
+            help=texts["sidebar"]["transformer_lifetime_help"]
+        )
+        solar_panel_lifetime = st.number_input(
+            texts["sidebar"]["solar_panel_lifetime"],
+            value=25,
+            help=texts["sidebar"]["solar_panel_lifetime_help"]
+        )
+        battery_lifetime = st.number_input(
+            texts["sidebar"]["battery_lifetime"],
+            value=10,
+            help=texts["sidebar"]["battery_lifetime_help"]
+        )
+        inverter_lifetime = st.number_input(
+            texts["sidebar"]["inverter_lifetime"],
+            value=10,
+            help=texts["sidebar"]["inverter_lifetime_help"]
+        )
+        installation_lifetime = st.number_input(
+            texts["sidebar"]["installation_lifetime"],
+            value=10,
+            help=texts["sidebar"]["installation_lifetime_help"]
+        )
+
+    # Monte Carlo Simulation Settings
+    with st.sidebar.expander(texts["sidebar"]["monte_carlo"], expanded=False):
+        monte_iterations = st.number_input(
+            texts["sidebar"]["monte_carlo_iterations"],
+            1, 200, 50,
+            help=texts["sidebar"]["monte_carlo_iterations_help"]
+        )
+
     if not use_battery:
         battery_pack_Ah = 0
         battery_pack_voltage = 0
@@ -244,26 +294,29 @@ def main_ui():
         "inverter_efficiency": inverter_efficiency,
         "battery_degradation_cost": battery_degradation_cost,
         "battery_usage_threshold": battery_usage_threshold,
-        "initial_costs": initial_costs,
-        "component_lifetime_years": component_lifetime_years,
-        "capital_lifetime_years": st.sidebar.number_input(
-            "Capital Investment Lifetime (Years) ", value=25,
-            help="Used for amortizing capital costs."
-        ),
-        "solar_cost_per_kw": st.sidebar.number_input(
-            "Solar Cost ($/kW) ", value=2000.0,
-            help="Cost per kW of solar capacity."
-        )
+        "station_cost": charging_station_cost,
+        "transformer_cost": transformer_cost,
+        "solar_panel_cost": solar_panel_cost,
+        "inverter_cost": inverter_cost,
+        "installation_cost":installation_cost,
+        "charging_station_lifetime": charging_station_lifetime,
+        "transformer_lifetime": transformer_lifetime,
+        "solar_panel_lifetime": solar_panel_lifetime,
+        "battery_lifetime": battery_lifetime,
+        "inverter_lifetime": inverter_lifetime,
+        "installation_lifetime": installation_lifetime
+
     }
 
     # -------------------------
     # Create Tabs (all use the same 'params')
     # -------------------------
-    tab1, tab2, tab3, tab4 = st.tabs(["Main Report", "Solar Report", "ROI Analysis", "Charging Cost"])
-    
+    tab1, tab2, tab3, tab4 = st.tabs([texts["tabs"]["main_report"], texts["tabs"]["solar_report"],
+                                   texts["tabs"]["roi_analysis"], texts["tabs"]["charging_cost"]])
+   
     ### TAB 1: Main Report (Overview)
     with tab1:
-        st.header("Overview – Annual Expected Returns, Costs, and Payback Period")
+        st.header(texts["tabs"]["main_report"])
         
         # Run simulation for the defined period (e.g., 30 days)
         sim_results = simulate_ev_station(params, seed=42)
@@ -272,50 +325,38 @@ def main_ui():
         # ---------------------------------------------------------------------
         # Section 1: Annual Summary Metrics
         # ---------------------------------------------------------------------
-        st.subheader("Annual Summary Metrics")
+        st.subheader(texts['tab1']["annual_summary_metrics"])
         col1, col2 = st.columns(2)
         with col1:
-            st.write(f"**Annual Energy Delivered:** {ann_results['annual_energy']:.2f} kWh")
-            st.write(f"**Annual Revenue:** ${ann_results['annual_revenue']:.2f}")
-            
+            st.write(f"**{texts['tab1']['annual_energy']}:** {ann_results['annual_energy']:.2f} kWh")
+            st.write(f"**{texts['tab1']['annual_revenue']}:** {format_currency(ann_results['annual_revenue'], local_exchange_rate, currency_symbol)}")
+                    
             st.markdown(
                 f"""
                 <div style="font-size:16px; margin-bottom: 1em;">
-                <strong>Annual Operating Cost:</strong> ${ann_results['annual_operating_cost']:.2f}
-                <span class="tooltip">?
+                  <strong>{texts['tab1']['annual_operating_cost']}:</strong> {format_currency(ann_results['annual_operating_cost'], local_exchange_rate, currency_symbol)}
+                  <span class="tooltip">?
                     <span class="tooltiptext">
-                    <strong>Calculation Details:</strong>
-                    <p>
-                        The Annual Operating Cost is calculated by annualizing the total operational cost incurred during the simulation period. This cost includes:
-                    </p>
-                    <ul>
-                        <li>Grid Import Charges (based on time-of-use tariffs)</li>
-                        <li>Battery Degradation Costs (if applicable)</li>
-                    </ul>
-                    <p>
-                        The cost is scaled to an annual value using the formula:
-                    </p>
-                    <code>Total Operational Cost × (365 / Simulation Days)</code>
+                      <strong>{texts['tab1']['operating_cost_tooltip_title']}</strong>
+                      <p>{texts['tab1']['operating_cost_tooltip']}</p>
                     </span>
-                </span>
+                  </span>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
-
-
-        with col2:
-            st.write(f"**Effective Cost per kWh:** ${ann_results['effective_cost_per_kwh']:.3f}")
-            st.write(f"**Annual Capital Cost:** ${ann_results['annual_capital_cost']:.2f}")
-            st.write(f"**Net Annual Profit:** ${ann_results['net_profit']:.2f}")
-        
+        with col2:            
+            st.write(f"**{texts['tab1']['effective_cost_per_kwh']}**: {format_currency(ann_results['effective_cost_per_kwh'], local_exchange_rate, currency_symbol)}")
+            st.write(f"**{texts['tab1']['annual_capital_cost']}**: {format_currency(ann_results['annual_capital_cost'], local_exchange_rate, currency_symbol)}")
+            st.write(f"**{texts['tab1']['net_annual_profit']}**: {format_currency(ann_results['net_profit'], local_exchange_rate, currency_symbol)}")
+            
         # ---------------------------------------------------------------------
         # Section 2: Investment & Cash Flow Overview
         # ---------------------------------------------------------------------
         st.subheader("Investment & Cash Flow Overview")
         # Compute individual component costs
         num_stations = params.get("num_stations", 1)
-        station_cost = params["initial_costs"].get("charging_station", 7000) * num_stations
+        station_cost = params.get("station_cost", 7000) * num_stations
         inverter_cost = (3000 if params["use_battery"] else 2000) * num_stations
         battery_cost = (params["battery_pack_price"] * params["number_of_battery_packs"] * num_stations) if params["use_battery"] else 0
         solar_cost = (params["solar_capacity"] / 10) * 1000
@@ -354,13 +395,13 @@ def main_ui():
         baseline_cost = grid_ann["effective_cost_per_kwh"]
 
         # Compute effective cost for Solar Only scenario
-        solar_only = simulate_solar_only(params)
+        solar_only = simulate_solar_system(params,False)
         solar_ann = annualize_results(solar_only, params)
         effective_cost_solar = solar_ann["effective_cost_per_kwh"]
 
         # Compute effective cost for Solar + Storage scenario (if battery is used)
         if params["use_battery"]:
-            storage = simulate_solar_with_storage(params)
+            storage = simulate_solar_system(params, True)
             storage_ann = annualize_results(storage, params)
             effective_cost_storage = storage_ann["effective_cost_per_kwh"]
         else:
@@ -559,8 +600,8 @@ def main_ui():
         # Using the common params, run simulation for scenario comparisons.
         scenarios = {
             "Grid Only": simulate_grid_only(params),
-            "Solar Only": simulate_solar_only(params),
-            "Solar + Storage": simulate_solar_with_storage(params)
+            "Solar Only": simulate_solar_system(params,False),
+            "Solar + Storage": simulate_solar_system(params,True)
         }
         results = {}
         for key, sim_res in scenarios.items():

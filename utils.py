@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
+from constants import CHARGING_STATION_PRICE, TRANSFORMER_PRICE, SOLAR_PANEL_PRICE, INVERTER_PRICE, INSTALLATION_PRICE, BATTERY_PACK_PRICE
 
 # --------------------------------------
 # Helper Functions & Grid Pricing
@@ -38,7 +39,7 @@ def solar_irradiance(time_in_day):
         return np.sin(np.pi * (time_in_day - 6) / 12)
     else:
         return 0.0
-    
+
 def solar_production(hour, solar_capacity):
     """
     A simplified solar production model.
@@ -84,7 +85,7 @@ def simulate_ev_station(params, seed=None):
     charging_station_power = params["charging_station_power"]  # kW
     charging_sessions_per_day = params["charging_sessions_per_day"]
     solar_capacity = params["solar_capacity"]  # kW
-    battery_max_charge_power = params["battery_max_charge_power"]  # in C (fraction of capacity)
+    battery_max_charge_power = params["battery_max_charge_power"]  # as a fraction of capacity
     
     # Battery parameters (if enabled)
     use_battery = params.get("use_battery", True)
@@ -105,20 +106,44 @@ def simulate_ev_station(params, seed=None):
     charging_price = params["charging_price"]
     
     # Capital costs & depreciation
-    initial_costs = params["initial_costs"].copy()
-    if use_battery:
-        initial_costs["battery"] = params["battery_pack_price"] * params["number_of_battery_packs"]
+
+    # Build a dictionary with each cost component based on the new params keys.
+    cost_components = {}
+    # Charging station cost is scaled by the number of stations.
+    cost_components["charging_station"] = params["station_cost"] * params["num_stations"]
+    # Transformer cost (assumed to be a fixed cost).
+    cost_components["transformer"] = params["transformer_cost"]
+    # Solar panel installation cost.
+    cost_components["solar_panel"] = params["solar_panel_cost"]
+    # Inverter cost scales with the number of stations.
+    cost_components["inverter"] = params["inverter_cost"] * params["num_stations"]
+    # Installation (miscellaneous) cost.
+    cost_components["installation"] = params["installation_cost"]
+    # Battery cost: only if a battery is used.
+    if params["use_battery"]:
+        cost_components["battery"] = params["battery_cost"]
     else:
-        initial_costs["battery"] = 0.0
-    component_lifetime_years = params["component_lifetime_years"]
+        cost_components["battery"] = 0.0
+
+    # Define lifetimes for each component from params.
+    lifetimes = {
+        "charging_station": params["charging_station_lifetime"],
+        "transformer": params["transformer_lifetime"],
+        "solar_panel": params["solar_panel_lifetime"],
+        "inverter": params["inverter_lifetime"],
+        "installation": params["installation_lifetime"],
+        "battery": params["battery_lifetime"]
+    }
+
+    # Compute depreciation for the simulation period.
     sim_years = params["simulation_days"] / 365.0
     depreciation = {}
-    for comp in initial_costs:
-        lifetime = component_lifetime_years.get(comp, 10)
-        depreciation[comp] = initial_costs[comp] * (sim_years / lifetime)
+    for comp, cost in cost_components.items():
+        lifetime = lifetimes.get(comp, 10)
+        depreciation[comp] = cost * (sim_years / lifetime)
     total_depreciation = sum(depreciation.values())
     
-    # Arrays to record per-time-step data
+    # Arrays to record per time-step data
     time_arr = np.zeros(total_steps)
     battery_soc_arr = np.zeros(total_steps)
     grid_import_arr = np.zeros(total_steps)     # EV demand met by grid
@@ -135,8 +160,7 @@ def simulate_ev_station(params, seed=None):
     battery_soc = battery_initial_soc
     prob_session = charging_sessions_per_day / (24 / dt)
     
-    total_ev_energy = 0.0  # sum of all EV demands
-    # We'll compute total_operational_cost after the loop by summing cost_grid_arr + cost_battery_arr
+    total_ev_energy = 0.0  # Sum of all EV demands
     
     for step in range(total_steps):
         current_time = step * dt  # simulation time in hours
@@ -214,7 +238,6 @@ def simulate_ev_station(params, seed=None):
         battery_soc_arr[step] = battery_soc
         time_arr[step] = current_time
     
-    # Summaries
     total_operational_cost = cost_grid_arr.sum() + cost_battery_arr.sum()
     total_revenue = revenue_arr.sum()
     grand_total_cost = total_operational_cost + total_depreciation
@@ -227,14 +250,13 @@ def simulate_ev_station(params, seed=None):
         rev_per_batt_kwh = np.nan
         battery_cost_per_kwh = np.nan
     
-    # Build a DataFrame for hourly details
     df_hourly = pd.DataFrame({
         "hour": np.arange(total_steps),
-        "time_in_day": time_arr,   # in hours
+        "time_in_day": time_arr,
         "ev_demand": demand_arr,
         "cost_grid": cost_grid_arr,
         "cost_battery": cost_battery_arr,
-        "cost": cost_grid_arr + cost_battery_arr,  # total cost this step
+        "cost": cost_grid_arr + cost_battery_arr,
         "solar_prod": solar_total_arr,
         "direct_solar": solar_used_arr,
         "battery_discharge": battery_discharged_arr,
@@ -244,26 +266,21 @@ def simulate_ev_station(params, seed=None):
     })
     
     results = {
-        # The DataFrame for per-hour data
         "hourly_details": df_hourly.to_dict("records"),
-        "time": time_arr, 
-        # Aggregates
-        "solar_total": solar_total_arr, 
-        "solar_used": solar_used_arr, 
+        "time": time_arr,
+        "solar_total": solar_total_arr,
+        "solar_used": solar_used_arr,
         "solar_to_battery": solar_to_battery_arr,
         "total_ev_energy": total_ev_energy,
-
         "total_operational_cost": total_operational_cost,
         "total_depreciation": total_depreciation,
         "grand_total_cost": grand_total_cost,
         "total_revenue": total_revenue,
         "net_profit": net_profit,
-        
         "rev_per_batt_kwh": rev_per_batt_kwh,
         "battery_cost_per_kwh": battery_cost_per_kwh,
     }
     return results
-
 
 # --------------------------------------
 # Monte Carlo Simulation
@@ -306,7 +323,8 @@ def simulate_grid_only(params):
             "solar_used": 0.0,
             "battery_discharge": 0.0
         })
-    capital_cost = params.get("installation_cost", 7000.0)
+    # Use TRANSFORMER_PRICE as a fallback for capital cost if needed.
+    capital_cost = TRANSFORMER_PRICE
     results = {
         "scenario": "Grid Only",
         "daily_energy": total_energy,
@@ -316,122 +334,153 @@ def simulate_grid_only(params):
     }
     return results
 
-def simulate_solar_only(params):
+def simulate_solar_system(params: dict, use_battery: bool):
     """
-    In the Solar Only scenario, a solar array is installed.
-    EV demand is met by solar when available; shortfalls are met by the grid.
-    Excess solar is wasted.
+    Simulates EV charging when a solar array is installed.
+    
+    If use_battery is True, a battery storage system is included:
+      - Excess solar charges the battery.
+      - The battery discharges to help meet EV demand.
+    Otherwise, the simulation runs as a solar-only system.
+    
+    In both cases, the function calculates hourly energy flows and computes the total capital cost,
+    including:
+      - Charging station cost (scaled by number of stations)
+      - Transformer cost
+      - Solar panel cost
+      - Inverter cost (scaled by number of stations)
+      - Installation cost
+      - Battery cost (only if use_battery is True)
+    
+    Returns a dictionary with the simulation results.
     """
     daily_ev_demand = params["daily_ev_demand"]
     solar_capacity = params["solar_capacity"]
-    profile = usage_profile()
+    profile = usage_profile()  # Assumes usage_profile() is imported from utils.py
     
     total_grid_cost = 0.0
     total_energy = 0.0
     total_solar_used = 0.0
-    hourly_details = []
-    for hour in range(24):
-        ev_demand = daily_ev_demand * profile[hour]
-        grid_rate = get_electricity_rate(hour, day_of_week=1)
-        solar_prod = solar_production(hour, solar_capacity)
-        solar_used = min(ev_demand, solar_prod)
-        grid_needed = max(ev_demand - solar_prod, 0.0)
-        cost = grid_needed * grid_rate
-        total_grid_cost += cost
-        total_energy += ev_demand
-        total_solar_used += solar_used
-        hourly_details.append({
-            "hour": hour,
-            "ev_demand": ev_demand,
-            "grid_rate": grid_rate,
-            "solar_production": solar_prod,
-            "solar_used": solar_used,
-            "grid_used": grid_needed,
-            "cost": cost,
-            "battery_discharge": 0.0
-        })
-    capital_cost = params["solar_cost_per_kw"] * solar_capacity
-    results = {
-        "scenario": "Solar Only",
-        "daily_energy": total_energy,
-        "daily_operational_cost": total_grid_cost,
-        "capital_cost": capital_cost,
-        "total_solar_used": total_solar_used,
-        "hourly_details": hourly_details
-    }
+
+    if use_battery:
+        # Solar + Storage simulation
+        battery_capacity = params["battery_capacity"]
+        max_charge_power = params["battery_max_charge_power"]
+        max_discharge_power = params["battery_max_charge_power"]
+        soc = 0.5 * battery_capacity
+        total_battery_discharge = 0.0
+        hourly_details = []
+        battery_history = [soc]
+        
+        for hour in range(24):
+            ev_demand = daily_ev_demand * profile[hour]
+            grid_rate = get_electricity_rate(hour, day_of_week=1)
+            solar_prod = solar_production(hour, solar_capacity)
+            
+            # Direct solar contribution
+            direct_solar = min(ev_demand, solar_prod)
+            remaining_demand = ev_demand - direct_solar
+            excess_solar = max(solar_prod - ev_demand, 0.0)
+            
+            # Use excess solar to charge battery
+            charge_possible = min(excess_solar, max_charge_power, battery_capacity - soc)
+            soc += charge_possible
+            
+            # Use battery to meet remaining demand, if possible
+            discharge_possible = min(remaining_demand, soc, max_discharge_power)
+            soc -= discharge_possible
+            remaining_demand -= discharge_possible
+            
+            grid_needed = remaining_demand
+            cost = grid_needed * grid_rate
+            
+            total_grid_cost += cost
+            total_energy += ev_demand
+            total_solar_used += direct_solar
+            total_battery_discharge += discharge_possible
+            
+            hourly_details.append({
+                "hour": hour,
+                "ev_demand": ev_demand,
+                "grid_rate": grid_rate,
+                "solar_production": solar_prod,
+                "direct_solar": direct_solar,
+                "excess_solar": excess_solar,
+                "battery_charged": charge_possible,
+                "battery_discharged": discharge_possible,
+                "grid_used": grid_needed,
+                "cost": cost,
+                "soc": soc
+            })
+            battery_history.append(soc)
+        
+        # Compute capital cost including battery cost.
+        station_cost = params["station_cost"] * params["num_stations"]
+        transformer_cost = params["transformer_cost"]
+        solar_panel_cost = params["solar_panel_cost"]
+        inverter_cost = params["inverter_cost"] * params["num_stations"]
+        installation_cost = params["installation_cost"]
+        battery_cost = params["battery_cost"]
+        total_capital_cost = (station_cost + transformer_cost + solar_panel_cost +
+                              inverter_cost + installation_cost + battery_cost)
+        
+        scenario = "Solar + Storage"
+        results = {
+            "scenario": scenario,
+            "daily_energy": total_energy,
+            "daily_operational_cost": total_grid_cost,
+            "capital_cost": total_capital_cost,
+            "total_solar_used": total_solar_used,
+            "total_battery_discharged": total_battery_discharge,
+            "hourly_details": hourly_details,
+            "battery_history": battery_history
+        }
+    else:
+        # Solar Only simulation (no battery)
+        hourly_details = []
+        for hour in range(24):
+            ev_demand = daily_ev_demand * profile[hour]
+            grid_rate = get_electricity_rate(hour, day_of_week=1)
+            solar_prod = solar_production(hour, solar_capacity)
+            solar_used = min(ev_demand, solar_prod)
+            grid_needed = max(ev_demand - solar_prod, 0.0)
+            cost = grid_needed * grid_rate
+            
+            total_grid_cost += cost
+            total_energy += ev_demand
+            total_solar_used += solar_used
+            
+            hourly_details.append({
+                "hour": hour,
+                "ev_demand": ev_demand,
+                "grid_rate": grid_rate,
+                "solar_production": solar_prod,
+                "solar_used": solar_used,
+                "grid_used": grid_needed,
+                "cost": cost,
+                "battery_discharged": 0.0
+            })
+        
+        # Compute capital cost without battery.
+        station_cost = params["station_cost"] * params["num_stations"]
+        transformer_cost = params["transformer_cost"]
+        solar_panel_cost = params["solar_panel_cost"]
+        inverter_cost = params["inverter_cost"] * params["num_stations"]
+        installation_cost = params["installation_cost"]
+        total_capital_cost = station_cost + transformer_cost + solar_panel_cost + inverter_cost + installation_cost
+        
+        scenario = "Solar Only"
+        results = {
+            "scenario": scenario,
+            "daily_energy": total_energy,
+            "daily_operational_cost": total_grid_cost,
+            "capital_cost": total_capital_cost,
+            "total_solar_used": total_solar_used,
+            "hourly_details": hourly_details
+        }
     return results
 
-def simulate_solar_with_storage(params):
-    """
-    In the Solar + Storage scenario, a battery is added.
-    Excess solar is stored and later discharged to serve EV demand.
-    """
-    daily_ev_demand = params["daily_ev_demand"]
-    solar_capacity = params["solar_capacity"]
-    battery_capacity = params["battery_capacity"]
-    max_charge_power = params["battery_max_charge_power"]
-    max_discharge_power = params["battery_max_charge_power"]
-    profile = usage_profile()
-    
-    soc = 0.5 * battery_capacity
-    battery_history = [soc]
-    
-    total_grid_cost = 0.0
-    total_energy = 0.0
-    total_solar_used = 0.0
-    total_battery_discharge = 0.0
-    hourly_details = []
-    
-    for hour in range(24):
-        ev_demand = daily_ev_demand * profile[hour]
-        grid_rate = get_electricity_rate(hour, day_of_week=1)
-        solar_prod = solar_production(hour, solar_capacity)
-        
-        direct_solar = min(ev_demand, solar_prod)
-        remaining_demand = ev_demand - direct_solar
-        excess_solar = max(solar_prod - ev_demand, 0.0)
-        
-        charge_possible = min(excess_solar, max_charge_power, battery_capacity - soc)
-        soc += charge_possible
-        
-        discharge_possible = min(remaining_demand, soc, max_discharge_power)
-        soc -= discharge_possible
-        remaining_demand -= discharge_possible
-        
-        grid_needed = remaining_demand
-        cost = grid_needed * grid_rate
-        
-        total_grid_cost += cost
-        total_energy += ev_demand
-        total_solar_used += direct_solar
-        total_battery_discharge += discharge_possible
-        
-        hourly_details.append({
-            "hour": hour,
-            "ev_demand": ev_demand,
-            "grid_rate": grid_rate,
-            "solar_production": solar_prod,
-            "direct_solar": direct_solar,
-            "excess_solar": excess_solar,
-            "battery_charged": charge_possible,
-            "battery_discharged": discharge_possible,
-            "grid_used": grid_needed,
-            "cost": cost,
-            "soc": soc
-        })
-        battery_history.append(soc)
-    capital_cost = params["solar_cost_per_kw"] * solar_capacity + params["battery_cost"]
-    results = {
-        "scenario": "Solar + Storage",
-        "daily_energy": total_energy,
-        "daily_operational_cost": total_grid_cost,
-        "capital_cost": capital_cost,
-        "total_solar_used": total_solar_used,
-        "total_battery_discharged": total_battery_discharge,
-        "hourly_details": hourly_details,
-        "battery_history": battery_history
-    }
-    return results
+
 
 # --------------------------------------
 # Annualization and ROI Calculation
@@ -442,8 +491,9 @@ def annualize_results(sim_results, params):
     Given simulation results and parameters, compute annualized values and effective cost per kWh,
     as well as annual revenue and net profit.
     
-    This function supports simulation results that come from either a multi-day simulation 
-    (with a "total_ev_energy" key) or a one-day simulation (with a "daily_energy" key).
+    This version uses the updated params dictionary (without an "initial_costs" key)
+    and calculates the annual capital cost by amortizing each cost component based on its lifetime.
+    Supports both multi-day and one-day simulation results.
     """
     simulation_days = params["simulation_days"]
     
@@ -451,12 +501,10 @@ def annualize_results(sim_results, params):
     if "total_ev_energy" in sim_results:
         total_ev_energy = sim_results["total_ev_energy"]
     elif "daily_energy" in sim_results:
-        # If only daily_energy is provided, multiply by the number of simulation days
         total_ev_energy = sim_results["daily_energy"] * simulation_days
     else:
         total_ev_energy = np.sum(sim_results.get("demand", []))
     
-    # Daily energy (kWh/day) and annual energy (kWh/year)
     daily_energy = total_ev_energy / simulation_days
     annual_energy = daily_energy * 365
     
@@ -469,26 +517,28 @@ def annualize_results(sim_results, params):
         total_operational_cost = (np.sum(sim_results.get("cost_grid", [])) +
                                   np.sum(sim_results.get("cost_battery", [])))
     
-    # Annualize operating cost.
     annual_operating_cost = total_operational_cost * (365 / simulation_days)
     
-    # Retrieve or compute the total capital cost.
-    if "capital_cost" in sim_results and sim_results["capital_cost"] > 0:
-        total_capital_cost = sim_results["capital_cost"]
-    else:
-        station_cost = params["initial_costs"].get("charging_station", 7000) * params["num_stations"]
-        inverter_cost = (3000 if params["use_battery"] else 2000) * params["num_stations"]
-        battery_cost = (params["battery_pack_price"] * params["number_of_battery_packs"] * params["num_stations"]) if params["use_battery"] else 0
-        solar_cost = (params["solar_capacity"] / 10) * 1000
-        install_cost = (params["solar_capacity"] / 10) * 1000
-        total_capital_cost = station_cost + inverter_cost + battery_cost + solar_cost + install_cost
+    # Calculate individual cost components from the updated params:
+    station_cost = params["station_cost"] * params["num_stations"]
+    transformer_cost = params["transformer_cost"]
+    solar_panel_cost = params["solar_panel_cost"]
+    inverter_cost = params["inverter_cost"] * params["num_stations"]
+    installation_cost = params["installation_cost"]
+    battery_cost = params["battery_cost"] if params["use_battery"] else 0.0
     
-    lifetime = params["capital_lifetime_years"]
-    annual_capital_cost = total_capital_cost / lifetime if lifetime > 0 else 0.0
+    # Amortize each component based on its lifetime:
+    annual_station_cost = station_cost / params["charging_station_lifetime"]
+    annual_transformer_cost = transformer_cost / params["transformer_lifetime"]
+    annual_solar_panel_cost = solar_panel_cost / params["solar_panel_lifetime"]
+    annual_inverter_cost = inverter_cost / params["inverter_lifetime"]
+    annual_installation_cost = installation_cost / params["installation_lifetime"]
+    annual_battery_cost = (battery_cost / params["battery_lifetime"]) if params["use_battery"] else 0.0
     
-    # Effective cost per kWh is the sum of annual operating cost and capital cost divided by annual energy
+    annual_capital_cost = (annual_station_cost + annual_transformer_cost + annual_solar_panel_cost +
+                           annual_inverter_cost + annual_installation_cost + annual_battery_cost)
+    
     effective_cost_per_kwh = (annual_operating_cost + annual_capital_cost) / annual_energy if annual_energy > 0 else float('nan')
-    
     annual_revenue = annual_energy * params["charging_price"]
     net_profit = annual_revenue - (annual_operating_cost + annual_capital_cost)
     
@@ -502,8 +552,6 @@ def annualize_results(sim_results, params):
     }
 
 
-
-
 # --------------------------------------
 # ROI & Sensitivity: Compute ROI for a Configuration
 # --------------------------------------
@@ -511,38 +559,13 @@ def annualize_results(sim_results, params):
 def compute_roi(params):
     """
     Compute ROI using the provided parameters dictionary.
-    
-    Expected keys in params:
-      - "simulation_days": Simulation period in days (should be 30 for this ROI analysis)
-      - "charging_sessions_per_day": e.g. 16 (assumed usage)
-      - "charging_station_power": e.g. 30 (kW)
-      - "charging_price": e.g. 0.5 ($/kWh)
-      - "solar_capacity": in kW (must be <= 18)
-      - "solar_randomness": e.g. 0.1
-      - "use_battery": Boolean (True for hybrid inverter, False for normal)
-      - "battery_pack_Ah", "battery_pack_voltage", "battery_pack_price"
-      - "number_of_battery_packs": (only for hybrid; 0 if not used)
-      - "battery_initial_soc_fraction": e.g. 0.5
-      - "battery_efficiency": e.g. 0.9
-      - "inverter_efficiency": e.g. 0.95
-      - "battery_degradation_cost": e.g. 0.05
-      - "battery_usage_threshold": e.g. 0.20
-      - "initial_costs": a dict of capital costs (e.g., "charging_station", "solar_panel", "inverter", etc.)
-      - "component_lifetime_years": a dict with lifetimes for each component.
-      - "num_stations": Number of stations to scale the result.
-      - "inverter_type": 'normal' or 'hybrid'
-      - (Other keys as needed by simulate_ev_station)
-      
-    The function runs a 30-day simulation for one station (using simulate_ev_station),
-    scales net profit by the number of stations, annualizes it, and computes ROI.
+    Runs a 30-day simulation for one station, scales net profit by number of stations, annualizes it,
+    and computes ROI as (annual net profit)/(total capital cost).
     """
-     # Infer inverter_type based on use_battery flag.
     inverter_type = "hybrid" if params.get("use_battery", False) else "normal"
     
-    # Run simulation for one station over 30 days.
     sim_result = simulate_ev_station(params, seed=42)
     
-    # Retrieve required configuration values from params.
     num_stations = params["num_stations"]
     solar_capacity = params["solar_capacity"]
     if inverter_type == "hybrid":
@@ -550,19 +573,15 @@ def compute_roi(params):
     else:
         num_battery_packs = 0
     
-    # Scale net profit by the number of stations and annualize (30-day simulation).
     net_profit = sim_result["net_profit"] * num_stations
     annual_net_profit = net_profit * (365 / 30)
     
-    # Compute capital cost for the station:
-    station_cost = 7000 * num_stations
-    inverter_cost = (3000 if inverter_type == "hybrid" else 2000) * num_stations
-    battery_cost = (1000 * num_battery_packs * num_stations) if inverter_type == "hybrid" else 0
-    # Assume solar and installation costs: $1000 per 10 kW installed.
-    solar_cost = (solar_capacity / 10) * 1000
-    install_cost = (solar_capacity / 10) * 1000
+    station_cost = CHARGING_STATION_PRICE * num_stations
+    inverter_cost = (INVERTER_PRICE if inverter_type == "hybrid" else 2000) * num_stations
+    battery_cost = (BATTERY_PACK_PRICE * num_battery_packs * num_stations) if inverter_type == "hybrid" else 0
+    solar_cost = (solar_capacity / 10) * SOLAR_PANEL_PRICE
+    install_cost = (solar_capacity / 10) * INSTALLATION_PRICE
     total_capital_cost = station_cost + inverter_cost + battery_cost + solar_cost + install_cost
     
-    # Compute ROI as (annual net profit)/(total capital cost)
     roi = annual_net_profit / total_capital_cost
     return roi, annual_net_profit, total_capital_cost
