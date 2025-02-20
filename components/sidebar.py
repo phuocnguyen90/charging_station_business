@@ -179,6 +179,49 @@ def render_sidebar(language: str) -> dict:
             help=texts["sidebar"]["monte_carlo_iterations_help"]
         )
 
+    # Advanced settings
+    
+    with st.sidebar.expander("Advanced Settings", expanded=False):
+        st.subheader("Electricity Rate Settings")
+        off_peak_rate = st.number_input("Off-peak rate ($/kWh)", value=0.06, step=0.01)
+        normal_rate = st.number_input("Normal rate ($/kWh)", value=0.108, step=0.01)
+        peak_rate = st.number_input("Peak rate ($/kWh)", value=0.188, step=0.01)
+        peak_start_morning = st.number_input("Morning Peak Start (hour)", value=9.5, step=0.5)
+        peak_end_morning = st.number_input("Morning Peak End (hour)", value=11.5, step=0.5)
+        peak_start_evening = st.number_input("Evening Peak Start (hour)", value=17.0, step=0.5)
+        peak_end_evening = st.number_input("Evening Peak End (hour)", value=20.0, step=0.5)
+        # Save into session state so that utils functions can access them.
+        st.session_state.off_peak_rate = off_peak_rate
+        st.session_state.normal_rate = normal_rate
+        st.session_state.peak_rate = peak_rate
+        st.session_state.peak_start_morning = peak_start_morning
+        st.session_state.peak_end_morning = peak_end_morning
+        st.session_state.peak_start_evening = peak_start_evening
+        st.session_state.peak_end_evening = peak_end_evening
+
+        st.subheader("Usage Profile Settings")
+        custom_profile_str = st.text_area(
+            "Custom Usage Profile (24 comma-separated values)",
+            value="0.02,0.02,0.02,0.02,0.02,0.02,0.06,0.06,0.06,0.06,0.03,0.03,0.03,0.03,0.03,0.03,0.08,0.08,0.08,0.08,0.08,0.02,0.02,0.02"
+        )
+        try:
+            custom_profile = [float(x.strip()) for x in custom_profile_str.split(",")]
+            if len(custom_profile) == 24:
+                st.session_state.custom_profile = custom_profile
+            else:
+                st.warning("Please enter exactly 24 values.")
+        except Exception as e:
+            st.error("Invalid input for usage profile.")
+
+    # Default values for not use_battery
+    if not use_battery:
+        battery_pack_Ah = 0
+        battery_pack_voltage = 0
+        battery_pack_price = 0
+        number_of_battery_packs = 0
+        initial_soc_fraction = 0.0
+        battery_max_charge_power=0.0
+
     # Return all parameters as a dictionary.
     return {
         "simulation_days": simulation_days,

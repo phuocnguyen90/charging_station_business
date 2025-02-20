@@ -92,7 +92,8 @@ UI_TEXTS = {
             "annual_energy": "Annual Energy Delivered",
             "annual_revenue": "Annual Revenue",
             "annual_operating_cost": "Annual Operating Cost",
-            "effective_cost_per_kwh": "Effective Cost ($/kWh)",
+            "effective_cost_per_kwh": "Effective Cost per kWh used",
+            "effective_cost_per_kwh_tooltip":"Average cost from utilizing from grid during off-peak hours, use solar directly, use battery",
             "annual_capital_cost": "Annual Capital Cost",
             "net_annual_profit": "Net Annual Profit",
             "total_initial_capital_cost": "Total Initial Capital Cost",
@@ -104,9 +105,25 @@ UI_TEXTS = {
                 - Grid Import Charges (based on time-of-use tariffs)
                 - Battery Degradation Costs (if applicable)
 
-                The cost is scaled to an annual value using the formula:
-                **Total Operational Cost × (365 / Simulation Days)**
-                """
+                The cost is scaled to an annual value using the formula: Total Operational Cost × (365 / Simulation Days)
+                """,
+            "investment_cash_flow_overview": "Investment & Cash Flow Overview",
+            "payback_analysis": "Payback Analysis",
+            "payback_period": "Payback Period",
+            "payback_not_achievable": "Payback period not achievable",
+            "years_with_inflation": "years with 5% inflation",
+            "component_contribution_analysis": "Effective cost projection",
+            "grid_only": "Grid Only",
+            "grid_and_solar": "Grid and Solar",
+            "grid_and_solar_and_battery": "Grid and Solar and Battery",
+            "effective_cost_per_kwh_label":"Effective cost per kWh",
+            "waterfall_chart_title":"Effective cost comparison",
+            "overview_explanation": """
+            Overview Explanation: The annual summary section shows energy production, revenue, operating and capital costs, and net profit. "
+        "The investment and cash flow overview displays the total initial capital cost alongside annual cash flow, while the payback analysis "
+        "calculates the period required to recoup the initial investment. Finally, the component contribution analysis (waterfall chart) "
+        "visually illustrates the impact of solar and battery investments on lowering the effective cost per kWh.
+            """
         }
     },
     "VI": {
@@ -201,11 +218,28 @@ UI_TEXTS = {
             "annual_revenue": "Doanh thu hàng năm",
             "annual_operating_cost": "Chi phí hoạt động hàng năm",
             "effective_cost_per_kwh": "Chi phí thực tế trung bình mỗi kWh",
+            "effective_cost_per_kwh_tooltip":"Chi phí này được tính bằng mức trung bình thông qua việc kết hợp nạp từ điện lưới lúc thấp điểm, sử dụng năng lượng mặt trời và hệ thống pin",
             "annual_capital_cost": "Chi phí vốn hàng năm",
             "net_annual_profit": "Lợi nhuận ròng hàng năm",
             "total_initial_capital_cost": "Tổng chi phí đầu tư ban đầu",
             "annual_cash_flow": "Dòng tiền hàng năm (Doanh thu - Chi phí vận hành)",
             "minimum_payback_period": "Thời gian hoàn vốn tối thiểu",
+            "investment_cash_flow_overview": "Vốn đầu tư và dòng tiền hàng năm",
+            "payback_analysis": "Thời gian hoàn vốn tối thiểu",
+            "payback_period": "Thời gian hoàn vốn",
+            "payback_not_achievable": "Không thể hoàn vốn",
+            "years_with_inflation": "năm với lạm phát 5%.",
+            "component_contribution_analysis": "Ước tính chi phí điện",
+            "grid_only": "Chỉ điện lưới",
+            "grid_and_solar": "NLMT bám tải",
+            "grid_and_solar_and_battery": "NLMT lưu trữ",
+            "waterfall_chart_title":"So sánh chi phí điện",
+            "overview_explanation": """
+            Overview Explanation: The annual summary section shows energy production, revenue, operating and capital costs, and net profit. "
+        "The investment and cash flow overview displays the total initial capital cost alongside annual cash flow, while the payback analysis "
+        "calculates the period required to recoup the initial investment. Finally, the component contribution analysis (waterfall chart) "
+        "visually illustrates the impact of solar and battery investments on lowering the effective cost per kWh.
+            """,
             "operating_cost_tooltip_title": "Chi tiết Tính toán:",
             "operating_cost_tooltip": """
                 Chi phí hoạt động hàng năm được tính bằng cách quy đổi chi phí hoạt động tổng cộng phát sinh trong khoảng thời gian mô phỏng sang giá trị hàng năm. Chi phí này bao gồm:

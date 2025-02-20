@@ -1,9 +1,8 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn.linear_model import LinearRegression
 from constants import CHARGING_STATION_PRICE, TRANSFORMER_PRICE, SOLAR_PANEL_PRICE, INVERTER_PRICE, INSTALLATION_PRICE, BATTERY_PACK_PRICE
 import locale
+locale.setlocale(locale.LC_ALL, '')  # set to system default locale
 
 # --------------------------------------
 # Helper Functions & Grid Pricing
@@ -75,15 +74,70 @@ def usage_profile():
     profile += [0.02]*3  # Hours 21-23: 0.02 each -> total 0.06
     return profile  # Sums to 1.0
 
+# --- Battery & Energy Flow Helpers for EV Station Simulation ---
+
+def discharge_battery_ev(demand_remaining, battery_soc, battery_capacity, battery_max_charge_power, dt, grid_rate, battery_usage_threshold, battery_deg_cost):
+    """
+    Discharge the battery during an EV charging step in the EV station simulation.
+    """
+    if demand_remaining > 0 and grid_rate >= battery_usage_threshold:
+        available_for_discharge = max(battery_soc - 0.2 * battery_capacity, 0)
+        max_discharge_energy = (battery_max_charge_power * battery_capacity) * dt
+        energy_from_battery = min(available_for_discharge, demand_remaining, max_discharge_energy)
+        battery_soc -= energy_from_battery
+        cost_battery = energy_from_battery * battery_deg_cost
+        return energy_from_battery, battery_soc, cost_battery
+    return 0.0, battery_soc, 0.0
+
+def offpeak_grid_charge_ev(battery_soc, battery_capacity, battery_max_charge_power, dt, grid_rate):
+    """
+    Charge the battery from the grid during off-peak hours.
+    """
+    max_grid_charge_energy = (battery_max_charge_power * battery_capacity) * dt
+    available_space = battery_capacity - battery_soc
+    grid_charge_energy = min(max_grid_charge_energy, available_space)
+    battery_soc += grid_charge_energy
+    cost = grid_charge_energy * grid_rate
+    return grid_charge_energy, battery_soc, cost
+
+def prepeak_charge_ev(battery_soc, battery_capacity, battery_max_charge_power, dt, grid_rate):
+    """
+    Charge the battery during the pre-peak period.
+    """
+    max_prepeak_charge = (battery_max_charge_power * battery_capacity) * dt
+    available_space = battery_capacity - battery_soc
+    prepeak_charge_energy = min(max_prepeak_charge, available_space)
+    battery_soc += prepeak_charge_energy
+    cost = prepeak_charge_energy * grid_rate
+    return prepeak_charge_energy, battery_soc, cost
+
+def charge_battery_with_energy(energy_available, battery_soc, battery_capacity, inverter_eff):
+    """
+    Charge the battery with available energy (from solar or grid),
+    applying inverter efficiency.
+    """
+    available_space = battery_capacity - battery_soc
+    energy_to_charge = min(energy_available * inverter_eff, available_space)
+    battery_soc += energy_to_charge
+    return energy_to_charge, battery_soc
+
+# --- Battery Helpers for Solar System Simulation ---
+
+def battery_charge_with_excess_solar(solar_excess, soc, battery_capacity, max_charge_power):
+    charge_possible = min(solar_excess, max_charge_power, battery_capacity - soc)
+    soc += charge_possible
+    return charge_possible, soc
+
+def battery_discharge_for_demand(remaining_demand, soc, max_discharge_power):
+    discharge_possible = min(remaining_demand, soc, max_discharge_power)
+    soc -= discharge_possible
+    return discharge_possible, soc
+
 # --------------------------------------
 # EV Station Simulation (Half-hour Time Steps)
 # --------------------------------------
 
 def simulate_ev_station(params, seed=None):
-    """
-    Simulate one run of the EV charging station over a chosen number of days
-    using half-hour time steps, returning both an hourly DataFrame and aggregate totals.
-    """
     if seed is not None:
         np.random.seed(seed)
         
@@ -91,50 +145,38 @@ def simulate_ev_station(params, seed=None):
     total_steps = int(params["simulation_days"] * 24 / dt)
     
     # Basic parameters
-    charging_station_power = params["charging_station_power"]  # kW
+    charging_station_power = params["charging_station_power"]
     charging_sessions_per_day = params["charging_sessions_per_day"]
-    solar_capacity = params["solar_capacity"]  # kW
-    battery_max_charge_power = params["battery_max_charge_power"]  # as a fraction of capacity
+    solar_capacity = params["solar_capacity"]
+    battery_max_charge_power = params["battery_max_charge_power"]
     
-    # Battery parameters (if enabled)
+    # Battery parameters
     use_battery = params.get("use_battery", True)
     if use_battery:
         battery_pack_Ah = params["battery_pack_Ah"]
         battery_pack_voltage = params["battery_pack_voltage"]
         number_of_battery_packs = params["number_of_battery_packs"]
-        battery_capacity = number_of_battery_packs * (battery_pack_Ah * battery_pack_voltage / 1000)  # kWh
+        battery_capacity = number_of_battery_packs * (battery_pack_Ah * battery_pack_voltage / 1000)
         battery_initial_soc = params["battery_initial_soc_fraction"] * battery_capacity
     else:
         battery_capacity = 0.0
         battery_initial_soc = 0.0
-    
+        
     battery_eff = params["battery_efficiency"]
     inverter_eff = params["inverter_efficiency"]
     battery_deg_cost = params["battery_degradation_cost"]
     battery_usage_threshold = params["battery_usage_threshold"]
     charging_price = params["charging_price"]
     
-    # Capital costs & depreciation
-
-    # Build a dictionary with each cost component based on the new params keys.
-    cost_components = {}
-    # Charging station cost is scaled by the number of stations.
-    cost_components["charging_station"] = params["station_cost"] * params["num_stations"]
-    # Transformer cost (assumed to be a fixed cost).
-    cost_components["transformer"] = params["transformer_cost"]
-    # Solar panel installation cost.
-    cost_components["solar_panel"] = params["solar_panel_cost"]
-    # Inverter cost scales with the number of stations.
-    cost_components["inverter"] = params["inverter_cost"] * params["num_stations"]
-    # Installation (miscellaneous) cost.
-    cost_components["installation"] = params["installation_cost"]
-    # Battery cost: only if a battery is used.
-    if params["use_battery"]:
-        cost_components["battery"] = params["battery_cost"]
-    else:
-        cost_components["battery"] = 0.0
-
-    # Define lifetimes for each component from params.
+    # Capital cost components & depreciation
+    cost_components = {
+        "charging_station": params["station_cost"] * params["num_stations"],
+        "transformer": params["transformer_cost"],
+        "solar_panel": params["solar_panel_cost"],
+        "inverter": params["inverter_cost"] * params["num_stations"],
+        "installation": params["installation_cost"],
+        "battery": params["battery_cost"] if params["use_battery"] else 0.0
+    }
     lifetimes = {
         "charging_station": params["charging_station_lifetime"],
         "transformer": params["transformer_lifetime"],
@@ -143,20 +185,16 @@ def simulate_ev_station(params, seed=None):
         "installation": params["installation_lifetime"],
         "battery": params["battery_lifetime"]
     }
-
-    # Compute depreciation for the simulation period.
     sim_years = params["simulation_days"] / 365.0
-    depreciation = {}
-    for comp, cost in cost_components.items():
-        lifetime = lifetimes.get(comp, 10)
-        depreciation[comp] = cost * (sim_years / lifetime)
+    depreciation = {comp: cost * (sim_years / lifetimes.get(comp, 10))
+                    for comp, cost in cost_components.items()}
     total_depreciation = sum(depreciation.values())
     
-    # Arrays to record per time-step data
+    # Initialize arrays for recording simulation data
     time_arr = np.zeros(total_steps)
     battery_soc_arr = np.zeros(total_steps)
-    grid_import_arr = np.zeros(total_steps)     # EV demand met by grid
-    solar_used_arr = np.zeros(total_steps)      # solar used directly for EV
+    grid_import_arr = np.zeros(total_steps)
+    solar_used_arr = np.zeros(total_steps)
     battery_discharged_arr = np.zeros(total_steps)
     cost_grid_arr = np.zeros(total_steps)
     cost_battery_arr = np.zeros(total_steps)
@@ -168,46 +206,43 @@ def simulate_ev_station(params, seed=None):
     
     battery_soc = battery_initial_soc
     prob_session = charging_sessions_per_day / (24 / dt)
-    
-    total_ev_energy = 0.0  # Sum of all EV demands
+    total_ev_energy = 0.0
     
     for step in range(total_steps):
-        current_time = step * dt  # simulation time in hours
-        day_of_week = int(current_time // 24) % 7  # 0=Mon,...,6=Sun
+        current_time = step * dt
+        day_of_week = int(current_time // 24) % 7
         time_in_day = current_time % 24
         
         grid_rate = get_electricity_rate(time_in_day, day_of_week)
         
-        # Solar production (kWh) with variability
+        # Solar production with randomness
         irr = solar_irradiance(time_in_day)
         raw_solar_gen = solar_capacity * irr * np.random.uniform(1 - params["solar_randomness"], 1) * dt
         solar_total_arr[step] = raw_solar_gen
         solar_gen = raw_solar_gen
         
-        # Generate EV charging demand for this time step
+        # Generate EV demand
         if np.random.rand() < prob_session:
-            demand = charging_station_power * dt  # kWh demand in this step
+            demand = charging_station_power * dt
         else:
             demand = 0.0
         demand_arr[step] = demand
         
-        # Step 1: Use available solar energy for EV charging
+        # Step 1: Use available solar for EV charging
         energy_from_solar = min(solar_gen, demand)
         solar_used_arr[step] = energy_from_solar
         demand_remaining = demand - energy_from_solar
         solar_gen -= energy_from_solar
         
-        # Step 2: Discharge battery if grid_rate >= threshold (but keep SoC above 20%)
-        if use_battery and demand_remaining > 0 and grid_rate >= battery_usage_threshold:
-            available_for_discharge = max(battery_soc - 0.2 * battery_capacity, 0)
-            max_discharge_energy = (battery_max_charge_power * battery_capacity) * dt
-            energy_from_battery = min(available_for_discharge, demand_remaining, max_discharge_energy)
-            battery_discharged_arr[step] = energy_from_battery
-            demand_remaining -= energy_from_battery
-            battery_soc -= energy_from_battery
-            cost_battery_arr[step] = energy_from_battery * battery_deg_cost
+        # Step 2: Discharge battery if needed
+        energy_from_battery, battery_soc, cost_batt = discharge_battery_ev(
+            demand_remaining, battery_soc, battery_capacity, battery_max_charge_power,
+            dt, grid_rate, battery_usage_threshold, battery_deg_cost)
+        battery_discharged_arr[step] = energy_from_battery
+        demand_remaining -= energy_from_battery
+        cost_battery_arr[step] = cost_batt
         
-        # Step 3: Remaining demand from grid
+        # Step 3: Use grid for any remaining demand
         energy_from_grid = demand_remaining
         grid_import_arr[step] = energy_from_grid
         cost_grid_arr[step] = energy_from_grid * grid_rate
@@ -216,34 +251,25 @@ def simulate_ev_station(params, seed=None):
         revenue_arr[step] = demand * charging_price
         total_ev_energy += demand
         
-        # Step 4a: Use extra solar to charge battery (if any left)
+        # Step 4a: Charge battery with leftover solar energy
         if use_battery and solar_gen > 0 and battery_soc < battery_capacity:
-            available_space = battery_capacity - battery_soc
-            energy_to_charge = min(solar_gen * inverter_eff, available_space)
-            battery_soc += energy_to_charge
-            solar_to_battery_arr[step] = energy_to_charge
+            charged, battery_soc = charge_battery_with_energy(solar_gen, battery_soc, battery_capacity, inverter_eff)
+            solar_to_battery_arr[step] = charged
         
-        # Step 4b: Off-peak grid charging (22:00–04:00)
+        # Step 4b: Off-peak grid battery charging
         if use_battery and (time_in_day < 4 or time_in_day >= 22) and battery_soc < battery_capacity:
-            max_grid_charge_energy = (battery_max_charge_power * battery_capacity) * dt
-            available_space = battery_capacity - battery_soc
-            grid_charge_energy = min(max_grid_charge_energy, available_space)
-            battery_soc += grid_charge_energy
-            grid_to_battery_arr[step] = grid_charge_energy
-            cost_grid_batt = grid_charge_energy * grid_rate
+            grid_charge, battery_soc, cost_grid_batt = offpeak_grid_charge_ev(
+                battery_soc, battery_capacity, battery_max_charge_power, dt, grid_rate)
+            grid_to_battery_arr[step] += grid_charge
             cost_grid_arr[step] += cost_grid_batt
         
-        # Step 4c: Pre-peak charging (16:00–17:00 on Mon–Sat, if SoC < 50%)
+        # Step 4c: Pre-peak battery charging on Mon–Sat if SoC < 50%
         if use_battery and day_of_week < 6 and (16.0 <= time_in_day < 17.0) and battery_soc < 0.5 * battery_capacity:
-            max_prepeak_charge = (battery_max_charge_power * battery_capacity) * dt
-            available_space = battery_capacity - battery_soc
-            prepeak_charge_energy = min(max_prepeak_charge, available_space)
-            battery_soc += prepeak_charge_energy
-            grid_to_battery_arr[step] += prepeak_charge_energy
-            cost_grid_prepeak = prepeak_charge_energy * grid_rate
+            prepeak_charge, battery_soc, cost_grid_prepeak = prepeak_charge_ev(
+                battery_soc, battery_capacity, battery_max_charge_power, dt, grid_rate)
+            grid_to_battery_arr[step] += prepeak_charge
             cost_grid_arr[step] += cost_grid_prepeak
         
-        # Record battery SoC and time
         battery_soc_arr[step] = battery_soc
         time_arr[step] = current_time
     
@@ -343,42 +369,26 @@ def simulate_grid_only(params):
     }
     return results
 
+# -------------------------------------------------------------------
+# Refactored Solar System Simulation (Hourly)
+# -------------------------------------------------------------------
+
 def simulate_solar_system(params: dict, use_battery: bool):
-    """
-    Simulates EV charging when a solar array is installed.
-    
-    If use_battery is True, a battery storage system is included:
-      - Excess solar charges the battery.
-      - The battery discharges to help meet EV demand.
-    Otherwise, the simulation runs as a solar-only system.
-    
-    In both cases, the function calculates hourly energy flows and computes the total capital cost,
-    including:
-      - Charging station cost (scaled by number of stations)
-      - Transformer cost
-      - Solar panel cost
-      - Inverter cost (scaled by number of stations)
-      - Installation cost
-      - Battery cost (only if use_battery is True)
-    
-    Returns a dictionary with the simulation results.
-    """
     daily_ev_demand = params["daily_ev_demand"]
     solar_capacity = params["solar_capacity"]
-    profile = usage_profile()  # Assumes usage_profile() is imported from utils.py
+    profile = usage_profile()
     
     total_grid_cost = 0.0
     total_energy = 0.0
     total_solar_used = 0.0
-
+    hourly_details = []
+    
     if use_battery:
-        # Solar + Storage simulation
         battery_capacity = params["battery_capacity"]
         max_charge_power = params["battery_max_charge_power"]
         max_discharge_power = params["battery_max_charge_power"]
         soc = 0.5 * battery_capacity
         total_battery_discharge = 0.0
-        hourly_details = []
         battery_history = [soc]
         
         for hour in range(24):
@@ -386,19 +396,17 @@ def simulate_solar_system(params: dict, use_battery: bool):
             grid_rate = get_electricity_rate(hour, day_of_week=1)
             solar_prod = solar_production(hour, solar_capacity)
             
-            # Direct solar contribution
+            # Direct solar usage
             direct_solar = min(ev_demand, solar_prod)
             remaining_demand = ev_demand - direct_solar
             excess_solar = max(solar_prod - ev_demand, 0.0)
             
-            # Use excess solar to charge battery
-            charge_possible = min(excess_solar, max_charge_power, battery_capacity - soc)
-            soc += charge_possible
+            # Charge battery with excess solar
+            charge_from_solar, soc = battery_charge_with_excess_solar(excess_solar, soc, battery_capacity, max_charge_power)
             
-            # Use battery to meet remaining demand, if possible
-            discharge_possible = min(remaining_demand, soc, max_discharge_power)
-            soc -= discharge_possible
-            remaining_demand -= discharge_possible
+            # Discharge battery to help meet remaining demand
+            discharge, soc = battery_discharge_for_demand(remaining_demand, soc, max_discharge_power)
+            remaining_demand -= discharge
             
             grid_needed = remaining_demand
             cost = grid_needed * grid_rate
@@ -406,7 +414,7 @@ def simulate_solar_system(params: dict, use_battery: bool):
             total_grid_cost += cost
             total_energy += ev_demand
             total_solar_used += direct_solar
-            total_battery_discharge += discharge_possible
+            total_battery_discharge += discharge
             
             hourly_details.append({
                 "hour": hour,
@@ -415,23 +423,21 @@ def simulate_solar_system(params: dict, use_battery: bool):
                 "solar_production": solar_prod,
                 "direct_solar": direct_solar,
                 "excess_solar": excess_solar,
-                "battery_charged": charge_possible,
-                "battery_discharged": discharge_possible,
+                "battery_charged": charge_from_solar,
+                "battery_discharged": discharge,
                 "grid_used": grid_needed,
                 "cost": cost,
                 "soc": soc
             })
             battery_history.append(soc)
         
-        # Compute capital cost including battery cost.
         station_cost = params["station_cost"] * params["num_stations"]
         transformer_cost = params["transformer_cost"]
         solar_panel_cost = params["solar_panel_cost"]
         inverter_cost = params["inverter_cost"] * params["num_stations"]
         installation_cost = params["installation_cost"]
         battery_cost = params["battery_cost"]
-        total_capital_cost = (station_cost + transformer_cost + solar_panel_cost +
-                              inverter_cost + installation_cost + battery_cost)
+        total_capital_cost = station_cost + transformer_cost + solar_panel_cost + inverter_cost + installation_cost + battery_cost
         
         scenario = "Solar + Storage"
         results = {
@@ -445,8 +451,6 @@ def simulate_solar_system(params: dict, use_battery: bool):
             "battery_history": battery_history
         }
     else:
-        # Solar Only simulation (no battery)
-        hourly_details = []
         for hour in range(24):
             ev_demand = daily_ev_demand * profile[hour]
             grid_rate = get_electricity_rate(hour, day_of_week=1)
@@ -470,7 +474,6 @@ def simulate_solar_system(params: dict, use_battery: bool):
                 "battery_discharged": 0.0
             })
         
-        # Compute capital cost without battery.
         station_cost = params["station_cost"] * params["num_stations"]
         transformer_cost = params["transformer_cost"]
         solar_panel_cost = params["solar_panel_cost"]
@@ -488,7 +491,6 @@ def simulate_solar_system(params: dict, use_battery: bool):
             "hourly_details": hourly_details
         }
     return results
-
 
 
 # --------------------------------------
