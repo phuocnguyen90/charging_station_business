@@ -4,14 +4,14 @@ UI_TEXTS = {
     "EN": {
         "title": "EV Charging Station Cost, Solar & ROI Simulation",
         "description": """
-This tool simulates the cost-effectiveness of an EV charging station under various configurations.
+            This tool simulates the cost-effectiveness of an EV charging station under various configurations.
 
-**Features include:**
-- Detailed simulation with solar production, battery integration, and grid tariffs.
-- A Solar Report for Buon Ma Thuot, Vietnam.
-- ROI analysis across different design configurations.
-- Explanations of the underlying math and formulas via hover-help.
-""",
+            **Features include:**
+            - Detailed simulation with solar production, battery integration, and grid tariffs.
+            - A Solar Report for Buon Ma Thuot, Vietnam.
+            - ROI analysis across different design configurations.
+            - Explanations of the underlying math and formulas via hover-help.
+            """,
         "sidebar": {
             "simulation_settings": "Simulation Settings",
             "simulation_duration": "Simulation Duration (Days)",
@@ -100,26 +100,26 @@ This tool simulates the cost-effectiveness of an EV charging station under vario
             "minimum_payback_period": "Minimum Payback Period",
             "operating_cost_tooltip_title": "Calculation Details:",
             "operating_cost_tooltip": """
-The Annual Operating Cost is calculated by annualizing the total operational cost incurred during the simulation period. This cost includes:
-- Grid Import Charges (based on time-of-use tariffs)
-- Battery Degradation Costs (if applicable)
+                The Annual Operating Cost is calculated by annualizing the total operational cost incurred during the simulation period. This cost includes:
+                - Grid Import Charges (based on time-of-use tariffs)
+                - Battery Degradation Costs (if applicable)
 
-The cost is scaled to an annual value using the formula:
-**Total Operational Cost × (365 / Simulation Days)**
-"""
+                The cost is scaled to an annual value using the formula:
+                **Total Operational Cost × (365 / Simulation Days)**
+                """
         }
     },
     "VI": {
         "title": "Mô phỏng chi phí đầu tư Trạm sạc EV",
         "description": """
-Công cụ này mô phỏng hiệu quả chi phí của trạm sạc EV với các cấu hình khác nhau.
+            Công cụ này mô phỏng hiệu quả chi phí của trạm sạc EV với các cấu hình khác nhau.
 
-**Các tính năng bao gồm:**
-- Mô phỏng chi tiết với sản lượng năng lượng mặt trời, tích hợp pin lưu trữ, và cước phí điện lưới.
-- Báo cáo năng lượng mặt trời cho Buôn Ma Thuột, Việt Nam.
-- Phân tích ROI theo các cấu hình thiết kế khác nhau.
-- Giải thích các phép tính và công thức thông qua trợ giúp khi di chuột.
-""",
+            **Các tính năng bao gồm:**
+            - Mô phỏng chi tiết với sản lượng năng lượng mặt trời, tích hợp pin lưu trữ, và cước phí điện lưới.
+            - Báo cáo năng lượng mặt trời cho Buôn Ma Thuột, Việt Nam.
+            - Phân tích ROI theo các cấu hình thiết kế khác nhau.
+            - Giải thích các phép tính và công thức thông qua trợ giúp khi di chuột.
+            """,
         "sidebar": {
             "simulation_settings": "Cài đặt Mô phỏng",
             "simulation_duration": "Thời gian mô phỏng (Ngày)",
@@ -135,8 +135,8 @@ Công cụ này mô phỏng hiệu quả chi phí của trạm sạc EV với c�
             "use_battery": "Sử dụng Pin",
             "use_battery_help": "Bật tích hợp pin lưu trữ để quản lý tải.",
             "solar_settings": "Cài đặt Năng lượng Mặt trời",
-            "solar_panel_capacity": "Công suất tấm pin mặt trời (kW)",
-            "solar_panel_capacity_help": "Công suất lắp đặt của tấm pin mặt trời.",
+            "solar_panel_capacity": "Công suất dàn pin mặt trời (kW)",
+            "solar_panel_capacity_help": "Công suất lắp đặt của toàn bộ dàn pin mặt trời.",
             "solar_variability": "Độ biến động của năng lượng mặt trời (Phần trăm)",
             "solar_variability_help": "Biểu thị độ biến động của sản lượng năng lượng mặt trời (ví dụ: do mây che).",
             "battery_pack_configuration": "Cấu hình Pin lưu trữ",
@@ -208,13 +208,13 @@ Công cụ này mô phỏng hiệu quả chi phí của trạm sạc EV với c�
             "minimum_payback_period": "Thời gian hoàn vốn tối thiểu",
             "operating_cost_tooltip_title": "Chi tiết Tính toán:",
             "operating_cost_tooltip": """
-Chi phí hoạt động hàng năm được tính bằng cách quy đổi chi phí hoạt động tổng cộng phát sinh trong khoảng thời gian mô phỏng sang giá trị hàng năm. Chi phí này bao gồm:
-- Phí mua điện lưới (dựa trên cước phí theo giờ)
-- Chi phí hao mòn pin (nếu áp dụng)
-  
-Chi phí được quy đổi hàng năm theo công thức:
-**Chi phí hoạt động tổng cộng × (365 / Số ngày mô phỏng)**
-"""
+                Chi phí hoạt động hàng năm được tính bằng cách quy đổi chi phí hoạt động tổng cộng phát sinh trong khoảng thời gian mô phỏng sang giá trị hàng năm. Chi phí này bao gồm:
+                - Phí mua điện lưới (dựa trên cước phí theo giờ)
+                - Chi phí hao mòn pin (nếu áp dụng)
+                
+                Chi phí được quy đổi hàng năm theo công thức:
+                **Chi phí hoạt động tổng cộng × (365 / Số ngày mô phỏng)**
+                """
         }
     }
 }

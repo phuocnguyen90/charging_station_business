@@ -3,10 +3,19 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 from constants import CHARGING_STATION_PRICE, TRANSFORMER_PRICE, SOLAR_PANEL_PRICE, INVERTER_PRICE, INSTALLATION_PRICE, BATTERY_PACK_PRICE
+import locale
 
 # --------------------------------------
 # Helper Functions & Grid Pricing
 # --------------------------------------
+
+def format_currency(amount, exchange_rate, symbol):
+    # Multiply by the exchange rate
+    local_value = amount * exchange_rate
+    # Format with grouping for thousands, using system locale
+    formatted_value = locale.format_string("%.2f", local_value, grouping=True)
+    return f"{symbol}{formatted_value}"
+
 
 def get_electricity_rate(time_in_day, day_of_week):
     """
