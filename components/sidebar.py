@@ -116,11 +116,16 @@ def render_sidebar(language: str,local_exchange_rate:int, currency_symbol:str ) 
                 0.0, 1.0, 0.5,
                 help=texts["sidebar"]["initial_battery_soc_help"]
             )
-            battery_max_charge_power = st.slider(
+            # Calculate total battery capacity in kWh
+            total_battery_capacity = number_of_battery_packs*battery_pack_Ah*battery_pack_voltage / 1000
+
+            battery_max_charge_rate  = st.slider(
                 texts["sidebar"]["battery_max_charge_rate"],
                 0.0, 1.0, 0.5,
                 help=texts["sidebar"]["battery_max_charge_rate_help"]
             )
+            battery_max_charge_power = battery_max_charge_rate * total_battery_capacity
+            
     else:
         battery_pack_Ah = battery_pack_voltage = battery_pack_price = number_of_battery_packs = 0
         initial_soc_fraction = 0.0
