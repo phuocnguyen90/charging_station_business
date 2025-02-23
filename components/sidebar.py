@@ -1,18 +1,41 @@
 # sidebar.py
 import streamlit as st
 from localization import UI_TEXTS
+from utils import format_currency
 
-def render_sidebar(language: str) -> dict:
+
+def render_sidebar(language: str,local_exchange_rate:int, currency_symbol:str ) -> dict:
+    
     """Render the left sidebar as several collapsible sections and return a dictionary of parameters."""
     texts = UI_TEXTS[language]
     
+    # Check if the language has changed, and update the local exchange rate accordingly.
+    # Store the current language in session state.
+    if "current_language" not in st.session_state or st.session_state["current_language"] != language:
+        st.session_state["current_language"] = language
+        if language == "VI":
+            st.session_state["local_exchange_rate"] = 25500
+        else:
+            st.session_state["local_exchange_rate"] = 1.0
+    local_rate = st.session_state["local_exchange_rate"]
+
+    # Set default base cost values (in USD) if not already present.
+    if "charging_price" not in st.session_state:
+        st.session_state["charging_price"] = 0.17
+    if "charging_station_cost" not in st.session_state:
+        st.session_state["charging_station_cost"] = 7000
+    if "transformer_cost" not in st.session_state:
+        st.session_state["transformer_cost"] = 1000
+    if "solar_panel_cost" not in st.session_state:
+        st.session_state["solar_panel_cost"] = 2000
+    if "inverter_cost" not in st.session_state:
+        st.session_state["inverter_cost"] = 3000
+    if "installation_cost" not in st.session_state:
+        st.session_state["installation_cost"] = 1000
+
     # Simulation Settings
     with st.sidebar.expander(texts["sidebar"]["simulation_settings"], expanded=True):
-        simulation_days = st.number_input(
-            texts["sidebar"]["simulation_duration"],
-            value=30,
-            help=texts["sidebar"]["simulation_duration_help"]
-        )
+
         charging_sessions_per_day = st.slider(
             texts["sidebar"]["average_charging_sessions"],
             0, 48, 12,
@@ -28,11 +51,24 @@ def render_sidebar(language: str) -> dict:
             value=30,
             help=texts["sidebar"]["charging_station_power_help"]
         )
-        charging_price = st.number_input(
+        # Slider works in base currency
+        charging_price_local = st.slider(
             texts["sidebar"]["charging_price"],
-            value=0.17,
-            help=texts["sidebar"]["charging_price_help"]
+            value=st.session_state["charging_price"] * local_rate,
+            min_value=0.0,
+            max_value=1.0*st.session_state["local_exchange_rate"],
+            step=0.01*st.session_state["local_exchange_rate"],
+            
+            key="charging_price_local",
+            help=texts["sidebar"]["charging_price_help"],
+            format="%.2f"
         )
+
+        # Display the local currency formatted value
+        st.session_state["charging_price"] = charging_price_local / local_rate
+        
+        st.write("Formatted Price:", format_currency(charging_price_local, 1, currency_symbol))
+
         use_battery = st.checkbox(
             texts["sidebar"]["use_battery"],
             value=True,
@@ -115,31 +151,46 @@ def render_sidebar(language: str) -> dict:
 
     # Capital Costs & Lifetimes
     with st.sidebar.expander(texts["sidebar"]["capital_costs_lifetimes"], expanded=False):
-        charging_station_cost = st.number_input(
+ 
+        
+        # Display inputs in local currency.
+        charging_station_cost_local = st.number_input(
             texts["sidebar"]["charging_station_cost"],
-            value=7000,
+            value=st.session_state["charging_station_cost"] * local_rate,
+            key="charging_station_cost_local",
             help=texts["sidebar"]["charging_station_cost_help"]
         )
-        transformer_cost = st.number_input(
+        st.session_state["charging_station_cost"] = charging_station_cost_local / local_rate
+        
+        transformer_cost_local = st.number_input(
             texts["sidebar"]["transformer_cost"],
-            value=1000,
+            value=st.session_state["transformer_cost"] * local_rate,
+            key="transformer_cost_local",
             help=texts["sidebar"]["transformer_cost_help"]
         )
-        solar_panel_cost = st.number_input(
+        st.session_state["transformer_cost"] = transformer_cost_local / local_rate
+        solar_panel_cost_local = st.number_input(
             texts["sidebar"]["solar_panel_cost"],
-            value=2000,
+            value=st.session_state["solar_panel_cost"] * local_rate,
+            key="solar_panel_cost_local",
             help=texts["sidebar"]["solar_panel_cost_help"]
         )
-        inverter_cost = st.number_input(
+        st.session_state["solar_panel_cost"] = solar_panel_cost_local / local_rate
+        inverter_cost_local = st.number_input(
             texts["sidebar"]["inverter_cost"],
-            value=3000,
+            value=st.session_state["inverter_cost"] * local_rate,
+            key="inverter_cost_local",
             help=texts["sidebar"]["inverter_cost_help"]
         )
-        installation_cost = st.number_input(
+        st.session_state["inverter_cost"] = inverter_cost_local / local_rate
+        installation_cost_local = st.number_input(
             texts["sidebar"]["installation_cost"],
-            value=1000,
+            value=st.session_state["installation_cost"] * local_rate,
+            key="installation_cost_local",
             help=texts["sidebar"]["installation_cost_help"]
         )
+        st.session_state["installation_cost"] = installation_cost_local / local_rate
+
         charging_station_lifetime = st.number_input(
             texts["sidebar"]["charging_station_lifetime"],
             value=10,
@@ -170,6 +221,12 @@ def render_sidebar(language: str) -> dict:
             value=10,
             help=texts["sidebar"]["installation_lifetime_help"]
         )
+        # Convert local currency inputs back to USD and update session state.
+        st.session_state["charging_station_cost"] = charging_station_cost_local / local_rate
+        st.session_state["transformer_cost"] = transformer_cost_local / local_rate
+        st.session_state["solar_panel_cost"] = solar_panel_cost_local / local_rate
+        st.session_state["inverter_cost"] = inverter_cost_local / local_rate
+        st.session_state["installation_cost"] = installation_cost_local / local_rate
 
     # Monte Carlo Simulation Settings
     with st.sidebar.expander(texts["sidebar"]["monte_carlo"], expanded=False):
@@ -179,25 +236,67 @@ def render_sidebar(language: str) -> dict:
             help=texts["sidebar"]["monte_carlo_iterations_help"]
         )
 
-    # Advanced settings
-    
+    # Advanced Settings
     with st.sidebar.expander("Advanced Settings", expanded=False):
+        # Set default base cost values (in USD) if not already present.
+        if "off_peak_rate_local" not in st.session_state:
+            st.session_state["off_peak_rate_local"] = 0.06
+        if "normal_rate_local" not in st.session_state:
+            st.session_state["normal_rate_local"] = 0.11
+        if "peak_rate_local" not in st.session_state:
+            st.session_state["peak_rate_local"] = 0.19
+        if "selling_excess_price" not in st.session_state:
+            st.session_state["selling_excess_price"] = 0.07
+        # Selling excess settings
+        st.subheader(texts["sidebar"]["selling_excess_checkbox"])
+        selling_excess = st.checkbox(
+            texts["sidebar"]["selling_excess_checkbox"],
+            value=True,
+            help=texts["sidebar"]["selling_excess_checkbox_help"]
+        )
+        if selling_excess:
+            excess_price_local = st.number_input(
+                texts["sidebar"]["selling_excess_price"],
+                value=st.session_state["selling_excess_price"] * st.session_state["local_exchange_rate"],
+                key="excess_price_local",
+                help=texts["sidebar"]["selling_excess_price_help"]
+            )
+            st.session_state["excess_price"] = excess_price_local / local_rate
+            selling_percentage= st.slider(
+                texts["sidebar"]["selling_percentage"],
+                0.0, 1.0, 0.5,
+                help=texts["sidebar"]["selling_percentage_help"]
+            )
+
+        # Electricity Rate Settings
         st.subheader("Electricity Rate Settings")
-        off_peak_rate = st.number_input("Off-peak rate ($/kWh)", value=0.06, step=0.01)
-        normal_rate = st.number_input("Normal rate ($/kWh)", value=0.108, step=0.01)
-        peak_rate = st.number_input("Peak rate ($/kWh)", value=0.188, step=0.01)
+        
+        off_peak_rate_local = st.number_input(
+            texts["sidebar"]["grid_import_tariff_offpeak"], 
+            key="off_peak_rate_local",
+            help=texts["sidebar"]["grid_import_tariff_offpeak_help"],
+            value=st.session_state["off_peak_rate_local"] * st.session_state["local_exchange_rate"])
+        normal_rate_local = st.number_input(
+            texts["sidebar"]["grid_import_tariff_normal"],
+            key="normal_rate_local",
+            help=texts["sidebar"]["grid_import_tariff_normal_help"], 
+            value=st.session_state["normal_rate_local"] * st.session_state["local_exchange_rate"])
+        peak_rate_local = st.number_input(
+            texts["sidebar"]["grid_import_tariff_peak"], 
+            key="peak_rate_local",
+            help=texts["sidebar"]["grid_import_tariff_peak"],
+            value=st.session_state["peak_rate_local"] * st.session_state["local_exchange_rate"])
         peak_start_morning = st.number_input("Morning Peak Start (hour)", value=9.5, step=0.5)
         peak_end_morning = st.number_input("Morning Peak End (hour)", value=11.5, step=0.5)
         peak_start_evening = st.number_input("Evening Peak Start (hour)", value=17.0, step=0.5)
         peak_end_evening = st.number_input("Evening Peak End (hour)", value=20.0, step=0.5)
-        # Save into session state so that utils functions can access them.
-        st.session_state.off_peak_rate = off_peak_rate
-        st.session_state.normal_rate = normal_rate
-        st.session_state.peak_rate = peak_rate
-        st.session_state.peak_start_morning = peak_start_morning
-        st.session_state.peak_end_morning = peak_end_morning
-        st.session_state.peak_start_evening = peak_start_evening
-        st.session_state.peak_end_evening = peak_end_evening
+        st.session_state["off_peak_rate"] = off_peak_rate_local/ local_rate
+        st.session_state["normal_rate"] = normal_rate_local/ local_rate
+        st.session_state["peak_rate"] = peak_rate_local/ local_rate
+        st.session_state["peak_start_morning"] = peak_start_morning
+        st.session_state["peak_end_morning"] = peak_end_morning
+        st.session_state["peak_start_evening"] = peak_start_evening
+        st.session_state["peak_end_evening"] = peak_end_evening
 
         st.subheader("Usage Profile Settings")
         custom_profile_str = st.text_area(
@@ -213,23 +312,21 @@ def render_sidebar(language: str) -> dict:
         except Exception as e:
             st.error("Invalid input for usage profile.")
 
-    # Default values for not use_battery
+    # Default values for when battery is not used.
     if not use_battery:
         battery_pack_Ah = 0
         battery_pack_voltage = 0
         battery_pack_price = 0
         number_of_battery_packs = 0
         initial_soc_fraction = 0.0
-        battery_max_charge_power=0.0
+        battery_max_charge_power = 0.0
 
-    # Return all parameters as a dictionary.
     return {
-        "simulation_days": simulation_days,
         "charging_sessions_per_day": charging_sessions_per_day,
         "charging_station_power": charging_station_power,
         "daily_ev_demand": charging_station_power * charging_sessions_per_day / 2,
         "num_stations": num_stations,
-        "charging_price": charging_price,
+        "charging_price":  st.session_state["charging_price"],
         "solar_capacity": solar_capacity,
         "solar_randomness": solar_randomness,
         "use_battery": use_battery,
@@ -245,16 +342,24 @@ def render_sidebar(language: str) -> dict:
         "inverter_efficiency": inverter_efficiency,
         "battery_degradation_cost": battery_degradation_cost,
         "battery_usage_threshold": battery_usage_threshold,
-        "station_cost": charging_station_cost,
-        "transformer_cost": transformer_cost,
-        "solar_panel_cost": solar_panel_cost,
-        "inverter_cost": inverter_cost,
-        "installation_cost": installation_cost,
+        "station_cost": st.session_state["charging_station_cost"],
+        "transformer_cost": st.session_state["transformer_cost"],
+        "solar_panel_cost": st.session_state["solar_panel_cost"],
+        "inverter_cost": st.session_state["inverter_cost"],
+        "installation_cost": st.session_state["installation_cost"],
         "charging_station_lifetime": charging_station_lifetime,
         "transformer_lifetime": transformer_lifetime,
         "solar_panel_lifetime": solar_panel_lifetime,
         "battery_lifetime": battery_lifetime,
         "inverter_lifetime": inverter_lifetime,
         "installation_lifetime": installation_lifetime,
-        "monte_iterations": monte_iterations
+        "monte_iterations": monte_iterations,
+        "selling_excess": selling_excess,
+        "selling_excess_price": st.session_state["excess_price"],
+        "selling_percentage": selling_percentage,
+        "peak_start_morning": peak_start_morning,
+        "peak_end_morning": peak_end_morning,
+        "peak_start_evening": peak_start_evening,
+        "peak_end_evening": peak_end_evening,
+        "custom_profile": custom_profile
     }

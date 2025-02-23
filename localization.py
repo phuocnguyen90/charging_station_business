@@ -78,7 +78,32 @@ UI_TEXTS = {
             "installation_lifetime_help": "Lifetime over which installation costs are amortized.",
             "monte_carlo": "Monte Carlo Simulation",
             "monte_carlo_iterations": "Monte Carlo Iterations",
-            "monte_carlo_iterations_help": "Number of iterations for Monte Carlo simulation."
+            "monte_carlo_iterations_help": "Number of iterations for Monte Carlo simulation.",
+            "advanced_settings": "Advanced settings",
+            "selling_excess_checkbox":"Selling excess energy",
+            "selling_excess_checkbox_help":"If checked, excess energy is sold back to the grid at the selling price. If not checked, excess energy is used to charge the battery.",
+            "selling_excess_price":"Selling price ($/kWh)",
+            "selling_excess_price_help":"The price at which excess energy is sold back to the grid. Only applicable if selling excess energy is checked.",
+            "selling_percentage":"Selling percentage",
+            "selling_percentage_help":"The percentage of excess energy that is sold back to the grid. Only applicable if selling excess energy is checked.",
+            "grid_import_tariff_normal": "Grid Import Tariff ($/kWh)",
+            "grid_import_tariff_normal_help": "The price charged by the grid for energy imported from the grid",
+            "grid_import_tariff_peak": "Grid Import Tariff Peak ($/kWh)",
+            "grid_import_tariff_peak_help": "The price charged by the grid for peak energy imported from the grid",
+            "grid_import_tariff_offpeak": "Grid Import Tariff Off-Peak ($/kWh)",
+            "grid_import_tariff_offpeak_help": "The price charged by the grid for off-peak energy imported from the grid",
+            "grid_export_tariff": "Grid Export Tariff ($/kWh)",
+            "grid_export_tariff_help": "The price charged by the grid for energy exported to the grid",
+            "morning_peak_hour_start": "Morning Peak Start",
+            "morning_peak_hour_start_help": "The hour of the day when peak energy is expected",
+            "morning_peak_hour_end": "Morning Peak End",
+            "morning_peak_hour_end_help": "The hour of the day when peak energy is expected",
+            "evening_peak_hour_start": "Evening Peak Start",
+            "evening_peak_hour_start_help": "The hour of the day when off-peak energy is expected",
+            "evening_peak_hour_end": "Evening Peak End",
+            "evening_peak_hour_end_help": "The hour of the day when off-peak energy is expected",
+
+
         },
         "tabs": {
             "main_report": "Main Report",
@@ -102,10 +127,14 @@ UI_TEXTS = {
             "operating_cost_tooltip_title": "Calculation Details:",
             "operating_cost_tooltip": """
                 The Annual Operating Cost is calculated by annualizing the total operational cost incurred during the simulation period. This cost includes:
-                - Grid Import Charges (based on time-of-use tariffs)
-                - Battery Degradation Costs (if applicable)
-
-                The cost is scaled to an annual value using the formula: Total Operational Cost × (365 / Simulation Days)
+                </p>
+                <ul>
+                    <li>Grid Import Charges (based on time-of-use tariffs)</li>
+                    <li>Battery Degradation Costs (if applicable)</li>
+                </ul>
+                <p>
+                    The cost is scaled to an annual value using the formula: Total Operational Cost × (365 / Simulation Days)
+                </p>
                 """,
             "investment_cash_flow_overview": "Investment & Cash Flow Overview",
             "payback_analysis": "Payback Analysis",
@@ -116,13 +145,53 @@ UI_TEXTS = {
             "grid_only": "Grid Only",
             "grid_and_solar": "Grid and Solar",
             "grid_and_solar_and_battery": "Grid and Solar and Battery",
-            "effective_cost_per_kwh_label":"Effective cost per kWh",
             "waterfall_chart_title":"Effective cost comparison",
             "overview_explanation": """
-            Overview Explanation: The annual summary section shows energy production, revenue, operating and capital costs, and net profit. "
-        "The investment and cash flow overview displays the total initial capital cost alongside annual cash flow, while the payback analysis "
-        "calculates the period required to recoup the initial investment. Finally, the component contribution analysis (waterfall chart) "
-        "visually illustrates the impact of solar and battery investments on lowering the effective cost per kWh.
+                ### Overview Explanation
+
+                The report is divided into several main sections that provide a comprehensive view of the project's performance:
+
+                1. **Annual Summary**
+                - **Annual Energy Output (`annual_energy`)**: The total kWh delivered to charging customers during the simulation period.
+
+                - **Annual Revenue**: Calculated by multiplying the annual energy output by the `charging_price`.
+
+                - **Annual Operating Cost (`annual_operating_cost`)**: Includes costs such as grid electricity and battery degradation costs.
+
+                - **Annual Capital Cost (`annual_capital_cost`)**: Calculated by amortizing capital investments (e.g. `station_cost`, `inverter_cost`, `solar_panel_cost`, `installation_cost` and, if applicable, `battery_cost`) over their respective lifetimes.
+
+                - **Net profit (`net_profit`)**: Annual revenue minus total operating and capital costs.
+
+                2. **Overview of investment and cash flow**
+                - **Total initial capital cost**: The sum of individual component costs, such as:
+
+                - **Charging station cost (`station_cost`)**: Cost per station multiplied by the number of stations.
+
+                - **Inverter cost (`inverter_cost`)**.
+
+                - **Battery storage cost (`battery_cost`)**: If `use_battery` is false, an assumed value (e.g. \$5000 per pack/charging station) will be used.
+
+                - **Solar panel cost (`solar_cost`)** and **Installation cost (`installation_cost`)**.
+                - **Annual Cash Flow**: The difference between annual revenue and annual operating costs.
+
+                3. **Payback Period Analysis**
+                - Calculate the number of years it will take to recover the total initial capital cost (excluding depreciation).
+
+                - Use an annual inflation rate (e.g. 5%) to adjust the annual cash flows.
+
+                - The payback period is determined by adding the adjusted annual cash flows until they equal or exceed the total cost of capital.
+
+                4. **Average Electricity Price Analysis**
+                - **Grid-Only Scenario**: The basic effective cost per kWh.
+
+                - **Grid-Only Scenario**: The effective cost per kWh when using a solar system.
+
+                - **Solar + Storage Scenario**: The effective cost per kWh when adding a battery system.
+
+                - If `use_battery` is unchecked, the assumed battery cost will be **estimated at \$5000 per unit/charger**, calculated annually over the battery life and added to the solar-only capital cost.
+
+                - This comparison shows how each investment component affects the effective electricity cost.
+
             """
         }
     },
@@ -161,7 +230,7 @@ UI_TEXTS = {
             "battery_pack_capacity_help": "Dung lượng của một Pin lưu trữ (Ampere-hour).",
             "battery_pack_voltage": "Điện áp Pin lưu trữ (V)",
             "battery_pack_voltage_help": "Điện áp của một Pin lưu trữ.",
-            "battery_pack_price": "Giá Pin lưu trữ ($)",
+            "battery_pack_price": "Giá Pin lưu trữ (đ)",
             "battery_pack_price_help": "Giá mỗi Pin lưu trữ.",
             "num_battery_packs": "Số lượng Pin lưu trữ cài đặt",
             "num_battery_packs_help": "Tổng số Pin lưu trữ được cài đặt.",
@@ -179,15 +248,15 @@ UI_TEXTS = {
             "grid_price_threshold": "Ngưỡng giá điện lưới ($/kWh)",
             "grid_price_threshold_help": "Nếu giá điện lưới vượt quá giá trị này, pin sẽ được xả ra.",
             "capital_costs_lifetimes": "Chi phí vốn & Tuổi thọ",
-            "charging_station_cost": "Chi phí Trạm sạc ($)",
+            "charging_station_cost": "Chi phí Trạm sạc (đ)",
             "charging_station_cost_help": "Chi phí đầu tư cho trạm sạc.",
-            "transformer_cost": "Chi phí Máy biến áp ($)",
+            "transformer_cost": "Chi phí Máy biến áp (đ)",
             "transformer_cost_help": "Chi phí của máy biến áp nếu cần.",
-            "solar_panel_cost": "Chi phí Tấm pin mặt trời ($)",
+            "solar_panel_cost": "Chi phí Tấm pin mặt trời (đ)",
             "solar_panel_cost_help": "Chi phí lắp đặt tấm pin mặt trời.",
-            "inverter_cost": "Chi phí Bộ Inverter ($)",
+            "inverter_cost": "Chi phí Bộ Inverter (đ)",
             "inverter_cost_help": "Chi phí của bộ inverter (nếu không sử dụng pin, dùng giá thấp hơn).",
-            "installation_cost": "Chi phí Lắp đặt & khác ($)",
+            "installation_cost": "Chi phí Lắp đặt & khác (đ)",
             "installation_cost_help": "Chi phí lắp đặt và các chi phí khác.",
             "charging_station_lifetime": "Tuổi thọ Trạm sạc (Năm)",
             "charging_station_lifetime_help": "Tuổi thọ dự kiến của trạm sạc.",
@@ -203,7 +272,31 @@ UI_TEXTS = {
             "installation_lifetime_help": "Thời gian khấu hao của các chi phí lắp đặt.",
             "monte_carlo": "Mô phỏng Monte Carlo",
             "monte_carlo_iterations": "Số lượt mô phỏng Monte Carlo",
-            "monte_carlo_iterations_help": "Số lần chạy mô phỏng Monte Carlo."
+            "monte_carlo_iterations_help": "Số lần chạy mô phỏng Monte Carlo.",
+            "advanced_settings": "Cài đặt nâng cao",
+            "selling_excess_checkbox":"Bán năng lượng dư thừa",
+            "selling_excess_checkbox_help":"Nếu được chọn, năng lượng dư thừa sẽ được bán lại cho lưới điện với giá bán. Nếu không được chọn, năng lượng dư thừa sẽ được sử dụng để sạc pin hoặc không tiêu thụ",
+            "selling_excess_price":"Giá bán (đ/kWh)",
+            "selling_excess_price_help":"Giá mà năng lượng dư thừa được bán lại cho lưới điện. Chỉ áp dụng nếu chọn bán năng lượng dư thừa",
+            "selling_percentage":"Tỷ lệ phần trăm bán",
+            "selling_percentage_help":"Tỷ lệ phần trăm năng lượng dư thừa được bán lại cho lưới điện. Chỉ áp dụng nếu chọn bán năng lượng dư thừa",
+            "grid_import_tariff_normal": "Giá nhập khẩu lưới điện bình thường (đ/kWh)",
+            "grid_import_tariff_normal_help": "Giá mà lưới điện tính cho năng lượng nhập khẩu từ lưới điện",
+
+            "grid_import_tariff_peak": "Giá nhập khẩu lưới điện cao điểm (đ/kWh)",
+            "grid_import_tariff_peak_help": "Giá do lưới tính cho năng lượng đỉnh nhập khẩu từ lưới",
+            "grid_import_tariff_offpeak": "Giá nhập khẩu lưới ngoài giờ cao điểm (đ/kWh)",
+            "grid_import_tariff_offpeak_help": "Giá do lưới tính cho năng lượng ngoài giờ cao điểm nhập khẩu từ lưới",
+            "grid_export_tariff": "Giá bán cho điện lưới ($/kWh)",
+            "grid_export_tariff_help": "Giá do lưới tính cho năng lượng xuất khẩu vào lưới",
+            "morning_peak_hour_start": "Giờ bắt đầu giờ cao điểm buổi sáng",
+            "morning_peak_hour_start_help": "Giờ trong ngày dự kiến ​​đạt năng lượng đỉnh",
+            "morning_peak_hour_end": "Giờ kết thúc giờ cao điểm buổi sáng",
+            "morning_peak_hour_end_help": "Giờ giờ trong ngày khi dự kiến ​​đạt năng lượng cao điểm",
+            "evening_peak_hour_start": "Bắt đầu giờ cao điểm buổi tối",
+            "evening_peak_hour_start_help": "Giờ trong ngày khi dự kiến ​​đạt năng lượng ngoài giờ cao điểm",
+            "evening_peak_hour_end": "Kết thúc giờ cao điểm buổi tối",
+            "evening_peak_hour_end_help": "Giờ trong ngày khi dự kiến ​​đạt năng lượng ngoài giờ cao điểm",
         },
         "tabs": {
             "main_report": "Báo cáo tổng quan",
@@ -217,9 +310,9 @@ UI_TEXTS = {
             "annual_energy": "Lượng điện bán được hàng năm",
             "annual_revenue": "Doanh thu hàng năm",
             "annual_operating_cost": "Chi phí hoạt động hàng năm",
-            "effective_cost_per_kwh": "Chi phí thực tế trung bình mỗi kWh",
+            "effective_cost_per_kwh": "Chi phí ước tính trung bình mỗi kWh",
             "effective_cost_per_kwh_tooltip":"Chi phí này được tính bằng mức trung bình thông qua việc kết hợp nạp từ điện lưới lúc thấp điểm, sử dụng năng lượng mặt trời và hệ thống pin",
-            "annual_capital_cost": "Chi phí vốn hàng năm",
+            "annual_capital_cost": "Chi phí khấu hao hàng năm",
             "net_annual_profit": "Lợi nhuận ròng hàng năm",
             "total_initial_capital_cost": "Tổng chi phí đầu tư ban đầu",
             "annual_cash_flow": "Dòng tiền hàng năm (Doanh thu - Chi phí vận hành)",
@@ -235,19 +328,47 @@ UI_TEXTS = {
             "grid_and_solar_and_battery": "NLMT lưu trữ",
             "waterfall_chart_title":"So sánh chi phí điện",
             "overview_explanation": """
-            Overview Explanation: The annual summary section shows energy production, revenue, operating and capital costs, and net profit. "
-        "The investment and cash flow overview displays the total initial capital cost alongside annual cash flow, while the payback analysis "
-        "calculates the period required to recoup the initial investment. Finally, the component contribution analysis (waterfall chart) "
-        "visually illustrates the impact of solar and battery investments on lowering the effective cost per kWh.
+                ### Tổng quan Giải thích
+
+                Báo cáo được chia thành một số phần chính cung cấp góc nhìn toàn diện về hiệu suất của dự án:
+
+                1. **Tóm tắt hàng năm**
+                - **Sản lượng năng lượng hàng năm (`annual_energy`)**: Tổng số kWh được cung cấp cho khách hàng đến sạc trong suốt thời gian mô phỏng.
+                - **Doanh thu hàng năm**: Được tính bằng cách nhân sản lượng năng lượng hàng năm với `charging_price`.
+                - **Chi phí vận hành hàng năm (`annual_operating_cost`)**: Bao gồm các chi phí như điện lưới và chi phí xuống cấp pin.
+                - **Chi phí vốn hàng năm (`annual_capital_cost`)**: Được tính bằng cách khấu hao các khoản đầu tư vốn (ví dụ: `station_cost`, `inverter_cost`, `solar_panel_cost`, `installation_cost` và, nếu có, `battery_cost`) trong suốt thời gian sử dụng tương ứng của chúng.
+                - **Lợi nhuận ròng (`net_profit`)**: Doanh thu hàng năm trừ đi tổng chi phí hoạt động và chi phí vốn.
+
+                2. **Tổng quan về đầu tư và dòng tiền**
+                - **Tổng chi phí vốn ban đầu**: Tổng chi phí thành phần riêng lẻ, chẳng hạn như:
+                - **Chi phí trạm sạc (`station_cost`)**: Chi phí cho mỗi trạm nhân với số lượng trạm.
+                - **Chi phí biến tần (`inverter_cost`)**.
+                - **Chi phí pin lưu trữ (`battery_cost`)**: Nếu `use_battery` là sai, một giá trị giả định (ví dụ: \$5000 cho mỗi gói/trạm sạc) sẽ được sử dụng.
+                - **Chi phí tấm pin năng lượng mặt trời (`solar_cost`)** và **Chi phí lắp đặt (`installation_cost`)**.
+                - **Dòng tiền hàng năm**: Chênh lệch giữa doanh thu hàng năm và chi phí vận hành hàng năm.
+
+                3. **Phân tích thời gian hoàn vốn**
+                - Tính toán số năm cần thiết để thu hồi tổng chi phí vốn ban đầu (không trừ khoản khấu hao).
+                - Sử dụng tỷ lệ lạm phát hàng năm (ví dụ: 5%) để điều chỉnh dòng tiền hàng năm.
+                - Thời gian hoàn vốn được xác định bằng cách cộng dồn các dòng tiền hàng năm đã điều chỉnh cho đến khi chúng bằng hoặc vượt quá tổng chi phí vốn.
+
+                4. **Phân tích giá điện bình quân**
+                - **Kịch bản chỉ sử dụng điện lưới**: Chi phí hiệu quả cơ bản cho mỗi kWh.
+                - **Kịch bản chỉ sử dụng NLMT hòa lưới bám tải**: Chi phí hiệu quả cho mỗi kWh khi sử dụng hệ thống năng lượng mặt trời.
+                - **Kịch bản NLMT + lưu trữ**: Chi phí hiệu quả cho mỗi kWh khi thêm hệ thống pin.
+                - Nếu `use_battery` không được đánh dấu, chi phí pin giả định sẽ được **ước tính là \$5000 cho mỗi bộ/trạm sạc)**, được tính theo năm trong suốt thời gian sử dụng pin và được cộng vào chi phí vốn chỉ có năng lượng mặt trời.
+                - So sánh này cho thấy từng thành phần đầu tư ảnh hưởng như thế nào đến chi phí điện hiệu quả.       
             """,
             "operating_cost_tooltip_title": "Chi tiết Tính toán:",
             "operating_cost_tooltip": """
+             
                 Chi phí hoạt động hàng năm được tính bằng cách quy đổi chi phí hoạt động tổng cộng phát sinh trong khoảng thời gian mô phỏng sang giá trị hàng năm. Chi phí này bao gồm:
-                - Phí mua điện lưới (dựa trên cước phí theo giờ)
-                - Chi phí hao mòn pin (nếu áp dụng)
-                
-                Chi phí được quy đổi hàng năm theo công thức:
-                **Chi phí hoạt động tổng cộng × (365 / Số ngày mô phỏng)**
+                <ul>
+                <li>- Phí mua điện lưới (dựa trên cước phí theo giờ)</li>
+                <li>- Chi phí hao mòn pin (nếu áp dụng)</li>
+                </ul>
+                <p> Chi phí được quy đổi hàng năm theo công thức:
+                <b>Chi phí hoạt động tổng cộng × (365 / Số ngày mô phỏng)</b></p>
                 """
         }
     }

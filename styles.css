@@ -1,4 +1,4 @@
-/* tooltip.css */
+/* styles.css */
 .tooltip {
     display: inline-block;
     position: relative;
@@ -39,4 +39,23 @@
     visibility: visible;
     opacity: 1;
   }
-  
+
+.language-box {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
+}
+
+/* Position an expander at the top-right corner */
+.top-right-expander > details {
+  position: fixed;
+  top: 1rem;       /* Adjust vertical offset */
+  right: 1rem;     /* Adjust horizontal offset */
+  z-index: 9999;   /* Keep it on top of other elements */
+  width: 280px;    /* Adjust width to your liking */
+  background-color: white; /* Ensure background is visible */
+  border: 1px solid #ccc;  /* Optional border */
+  border-radius: 4px;      /* Optional rounded corners */
+  box-shadow: 2px 2px 8px rgba(0,0,0,0.2); /* Optional shadow */
+}

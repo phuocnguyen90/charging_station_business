@@ -165,7 +165,7 @@ cython_debug/
 *.doc
 *.docx
 *.pdf
-
+*.pyc
 .github
 local_data
 logs
