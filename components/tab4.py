@@ -2,7 +2,7 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 import pandas as pd
-from utils import annualize_results, format_currency, simulate_solar_system, simulate_grid_only
+from utils import annualize_results, format_currency, simulate_solar_only, simulate_grid_only, simulate_solar_storage, compute_infrastructure_cost, simulate_ev_station, get_hourly_details
 from localization import UI_TEXTS
 import numpy as np
 
@@ -23,8 +23,8 @@ def render_tab4(params: dict, language: str, local_exchange_rate: float, currenc
     # Using the common params, run simulation for scenario comparisons.
     scenarios = {
         "Grid Only": simulate_grid_only(params),
-        "Solar Only": simulate_solar_system(params,False),
-        "Solar + Storage": simulate_solar_system(params,True)
+        "Solar Only": simulate_solar_only(params),
+        "Solar + Storage": simulate_solar_storage(params)
     }
     results = {}
     for key, sim_res in scenarios.items():
@@ -32,14 +32,9 @@ def render_tab4(params: dict, language: str, local_exchange_rate: float, currenc
         # Merge the annualized values with the simulation results.
         results[key] = {**sim_res, **ann}
     
-    # Compute the total initial capital cost (using the same formula used elsewhere)
-    num_stations = params.get("num_stations", 1)  # default to 1 if not provided
-    station_cost = 7000 * num_stations
-    inverter_cost = (3000 if params["use_battery"] else 2000) * num_stations
-    battery_cost = (params["battery_pack_price"] * params["number_of_battery_packs"] * num_stations) if params["use_battery"] else 0
-    solar_cost = (params["solar_capacity"] / 10) * 1000
-    install_cost = (params["solar_capacity"] / 10) * 1000
-    total_capital_cost = station_cost + inverter_cost + battery_cost + solar_cost + install_cost
+    # Compute the total initial capital cost 
+
+    total_capital_cost = compute_infrastructure_cost(params,False)
 
     # Build summary rows, now including ROI computed as net profit divided by total_capital_cost.
     summary = []
@@ -61,14 +56,15 @@ def render_tab4(params: dict, language: str, local_exchange_rate: float, currenc
     st.dataframe(df_summary)
     
     st.subheader("Detailed Hourly Data (Solar + Storage)")
+    sim_data = simulate_ev_station(params, seed=42)
     if "Solar + Storage" in results:
-        df_hourly = pd.DataFrame(results["Solar + Storage"]["hourly_details"])
+        df_hourly = get_hourly_details(sim_data)
         st.dataframe(df_hourly)
     
     st.subheader("Visualizations")
     # Visualization 1: Line Chart for Cost per Hour with a Second Y-Axis Column Chart for Effective Cost ($/kWh)
     if "Solar + Storage" in results:
-        df_hourly = pd.DataFrame(results["Solar + Storage"]["hourly_details"])
+        
         
         # Ensure the 'cost' column exists. If not, create it from cost_grid + cost_battery.
         if "cost" not in df_hourly.columns:

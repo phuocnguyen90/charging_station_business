@@ -43,7 +43,7 @@ def render_sidebar(language: str,local_exchange_rate:int, currency_symbol:str ) 
         )
         num_stations = st.number_input(
             texts["sidebar"]["num_stations"],
-            1, 100, 1,
+            1, 20, 
             help=texts["sidebar"]["num_stations_help"]
         )
         charging_station_power = st.number_input(

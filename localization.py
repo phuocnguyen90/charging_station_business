@@ -2,6 +2,33 @@
 
 UI_TEXTS = {
     "EN": {
+        "wizard":{
+            "step0": {
+                "title": "Welcome to the EV Charging Station Cost, Solar & ROI Simulation",
+                "description": """
+                    This tool simulates the cost-effectiveness of an EV charging station under various configurations.
+
+                    **Features include:**
+                    - Detailed simulation with solar production, battery integration, and grid tariffs.
+                    - A Solar Report for Buon Ma Thuot, Vietnam.
+                    - ROI analysis across different design configurations.
+                    - Explanations of the underlying math and formulas via hover-help.
+                    """,
+                "mode_basic":"Basic",
+                "mode_advanced":"Advanced",
+                "mode_basic_desc":"Use the basic mode to simulate a single configuration.",
+                "mode_advanced_desc":"Use the advanced mode to compare multiple configurations.",
+                "start_button":"Start Simulation",
+                "user_type":"Are you a homeowner or a business",
+                "user_type_desc":"Select the user type for the simulation.",
+                "user_type_individual":"Individual/Homeowner",
+                "user_type_individual_desc":"For individual users, the sim will assume the use of consumer grade equipment and consumer grid import fee schema (schema 1: tiered pricing per consumption rate)",
+                "user_type_business":"Business",
+                "user_type_business_desc":"For a business user,, the sim will assume the use of business grade equipment and business grid import fee schema (schema 2: pricing per consumption period)",
+                "user_effective_cost":"Effective Cost ($/kWh)"
+                }
+
+             },
         "title": "EV Charging Station Cost, Solar & ROI Simulation",
         "description": """
             This tool simulates the cost-effectiveness of an EV charging station under various configurations.
@@ -13,6 +40,7 @@ UI_TEXTS = {
             - Explanations of the underlying math and formulas via hover-help.
             """,
         "sidebar": {
+            "general_settings":"General settings",
             "simulation_settings": "Simulation Settings",
             "simulation_duration": "Simulation Duration (Days)",
             "simulation_duration_help": "The number of days to simulate (affects depreciation and energy totals).",
@@ -207,6 +235,7 @@ UI_TEXTS = {
             - Giải thích các phép tính và công thức thông qua trợ giúp khi di chuột.
             """,
         "sidebar": {
+            "general_settings":"Cài đặt chung",
             "simulation_settings": "Cài đặt Mô phỏng",
             "simulation_duration": "Thời gian mô phỏng (Ngày)",
             "simulation_duration_help": "Số ngày mô phỏng (ảnh hưởng đến khấu hao và tổng năng lượng).",

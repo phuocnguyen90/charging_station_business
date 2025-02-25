@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-from utils import simulate_ev_station, annualize_results, compute_roi, simulate_solar_system
+from utils import simulate_ev_station, annualize_results, compute_roi, simulate_solar_storage
 from localization import UI_TEXTS
 from sklearn.linear_model import LinearRegression
 
@@ -63,7 +63,7 @@ def render_tab3(params: dict, language: str, local_exchange_rate: float, currenc
                     params["use_battery"] = False
                     params["number_of_battery_packs"] = 0
                     # Run the solar-only simulation (which includes solar production and revenue)
-                    sim_results = simulate_solar_system(params, use_battery=False)
+                    sim_results = simulate_solar_storage(params)
                     # Annualize results
                     ann_results = annualize_results(sim_results, params)
                     # Compute annual revenue from the simulation result

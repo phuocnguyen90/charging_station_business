@@ -1,7 +1,7 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 import pandas as pd
-from utils import simulate_ev_station, annualize_results, format_currency, simulate_solar_system, simulate_grid_only
+from utils import simulate_ev_station, annualize_results, format_currency, simulate_solar_only, simulate_grid_only, simulate_solar_storage, compute_infrastructure_cost
 from localization import UI_TEXTS
 import numpy as np
 
@@ -59,12 +59,8 @@ def render_tab1(params: dict, language: str, local_exchange_rate: float, currenc
     # ---------------------------------------------------------------------
     st.subheader(texts['tab1']["investment_cash_flow_overview"])
     num_stations = params.get("num_stations", 1)
-    station_cost = params.get("station_cost", 7000) * num_stations
-    inverter_cost = (3000 if params["use_battery"] else 2000) * num_stations
-    battery_cost = (params["battery_pack_price"] * params["number_of_battery_packs"] * num_stations) if params["use_battery"] else 0
-    solar_cost = (params["solar_capacity"] / 10) * 1000
-    install_cost = (params["solar_capacity"] / 10) * 1000
-    total_capital_cost = station_cost + inverter_cost + battery_cost + solar_cost + install_cost
+
+    total_capital_cost = compute_infrastructure_cost(params, use_roi_constants=False)
 
     st.write(f"**{texts['tab1']['total_initial_capital_cost']}**: {format_currency(total_capital_cost, local_exchange_rate, currency_symbol)}")
     
@@ -112,13 +108,13 @@ def render_tab1(params: dict, language: str, local_exchange_rate: float, currenc
     baseline_cost = grid_ann["effective_cost_per_kwh"]
 
     # Solar Only scenario
-    solar_only = simulate_solar_system(params, False)
+    solar_only = simulate_solar_only(params)
     solar_ann = annualize_results(solar_only, params)
     effective_cost_solar = solar_ann["effective_cost_per_kwh"]
 
     # Solar + Storage scenario:
     if params["use_battery"]:
-        storage = simulate_solar_system(params, True)
+        storage = simulate_solar_storage(params)
         storage_ann = annualize_results(storage, params)
         effective_cost_storage = storage_ann["effective_cost_per_kwh"]
     else:
@@ -127,8 +123,8 @@ def render_tab1(params: dict, language: str, local_exchange_rate: float, currenc
             base_battery_cost = params["battery_pack_price"] * params["number_of_battery_packs"] * num_stations
         else:
             base_battery_cost = 5000 * num_stations  # fallback benchmark value
-        integration_cost = params.get("integration_cost", 500) * num_stations
-        hypothetical_battery_cost = base_battery_cost + integration_cost
+        installation_cost = params.get("installation_cost", 500) * num_stations
+        hypothetical_battery_cost = base_battery_cost + installation_cost
         additional_annual_battery_cost = hypothetical_battery_cost / params["battery_lifetime"]
         operational_savings = 0
         if "battery_operational_savings_fraction" in params:

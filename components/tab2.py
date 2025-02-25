@@ -1,7 +1,7 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 import pandas as pd
-from utils import simulate_ev_station, annualize_results, format_currency, simulate_solar_system, simulate_grid_only
+from utils import simulate_ev_station
 from localization import UI_TEXTS
 import numpy as np
 

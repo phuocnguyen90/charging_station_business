@@ -7,6 +7,7 @@ from components.tab2 import render_tab2
 from components.tab3 import render_tab3
 from components.tab4 import render_tab4 
 from components.tab5 import render_tab5
+from components.debug_tab import render_debug_tab
 
 def local_css(file_name):
     with open(file_name) as f:
@@ -49,12 +50,13 @@ def main_ui():
     params = render_sidebar(language, local_exchange_rate, currency_symbol)
     
     # Create Tabs for different reports.
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab_debug  = st.tabs([
         texts["tabs"]["main_report"],
         texts["tabs"]["solar_report"],
         texts["tabs"]["roi_analysis"],
         texts["tabs"]["charging_cost"],
-        "Daily simulation"
+        "Daily simulation",
+        "Debug"
     ])
     
     with tab1:
@@ -67,6 +69,9 @@ def main_ui():
         render_tab4(params, language, local_exchange_rate, currency_symbol)
     with tab5:
         render_tab5(params, language, local_exchange_rate, currency_symbol)
+    with tab_debug:
+
+        render_debug_tab(params, language, local_exchange_rate, currency_symbol)
 
 if __name__ == '__main__':
     main_ui()
