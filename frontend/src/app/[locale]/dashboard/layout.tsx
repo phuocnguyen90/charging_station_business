@@ -17,8 +17,11 @@ export default function DashboardLayout({
                     <Link href="/dashboard/client/wizard" className="block hover:text-blue-400">
                         {t('client')}
                     </Link>
-                    <Link href="/dashboard/installer" className="block hover:text-blue-400 text-gray-400">
-                        {t('installer')} (WIP)
+                    <Link href="/dashboard/installer/inventory" className="block hover:text-blue-400">
+                        {t('installer')}
+                    </Link>
+                    <Link href="/dashboard/admin/users" className="block hover:text-blue-400">
+                        {t('admin')}
                     </Link>
                 </nav>
             </aside>

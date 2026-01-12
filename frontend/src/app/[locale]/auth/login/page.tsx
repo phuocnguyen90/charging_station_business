@@ -44,11 +44,20 @@ export default function LoginPage() {
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
             });
 
-            login(res.data.access_token);
+            await login(res.data.access_token);
             toast.success("Logged in successfully");
 
-            // Basic redirect - later handle "returnUrl"
-            router.push("/dashboard/client/wizard");
+            // Fetch user to determine redirect
+            const meRes = await api.get("/auth/me");
+            const role = meRes.data.role;
+
+            if (role === "admin") {
+                router.push("/dashboard/admin/users");
+            } else if (role === "installer") {
+                router.push("/dashboard/installer/inventory");
+            } else {
+                router.push("/dashboard/client/wizard");
+            }
         } catch (err) {
             console.error(err);
             toast.error("Invalid credentials");

@@ -12,14 +12,14 @@ interface User {
 
 interface AuthContextType {
     user: User | null;
-    login: (token: string) => void;
+    login: (token: string) => Promise<void>;
     logout: () => void;
     isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
     user: null,
-    login: () => { },
+    login: async () => { },
     logout: () => { },
     isAuthenticated: false,
 });
@@ -30,19 +30,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     useEffect(() => {
         // Check for token on mount
-        const token = localStorage.getItem("token");
-        if (token) {
-            // Ideally we fetch user profile here. For POC we just decode or assume logic.
-            // Let's decode or simply set generic user if decoding logic isn't handy on client without lib
-            // For security, we should have an endpoint /auth/me. 
-            // We'll skip /auth/me for this step and just trust the token exists.
-            setUser({ email: "user@example.com", full_name: "User", role: "client" });
-        }
+        const loadUser = async () => {
+            const token = localStorage.getItem("token");
+            if (token) {
+                try {
+                    const res = await api.get("/auth/me");
+                    setUser(res.data);
+                } catch (err) {
+                    console.error("Failed to load user", err);
+                    localStorage.removeItem("token");
+                }
+            }
+        };
+        loadUser();
     }, []);
 
-    const login = (token: string) => {
+    const login = async (token: string) => {
         localStorage.setItem("token", token);
-        setUser({ email: "user@example.com", full_name: "Current User", role: "client" }); // Placeholder
+        try {
+            const res = await api.get("/auth/me");
+            setUser(res.data);
+        } catch {
+            // Handle error
+        }
     };
 
     const logout = () => {

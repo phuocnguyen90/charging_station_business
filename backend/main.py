@@ -27,8 +27,9 @@ app.include_router(simulation.router, prefix=f"{settings.API_V1_STR}/simulation"
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(market.router, prefix=f"{settings.API_V1_STR}/market", tags=["market"])
 app.include_router(collaboration.router, prefix=f"{settings.API_V1_STR}/collaboration", tags=["collaboration"])
-from routers.v1 import quotes
+from routers.v1 import quotes, admin
 app.include_router(quotes.router, prefix=f"{settings.API_V1_STR}/quotes", tags=["quotes"])
+app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["admin"])
 
 @app.get("/")
 def root():
@@ -37,4 +38,5 @@ def root():
 # Event handler for startup
 @app.on_event("startup")
 async def startup():
+    print(f"CORS ORIGINS: {settings.BACKEND_CORS_ORIGINS}")
     Base.metadata.create_all(bind=engine)

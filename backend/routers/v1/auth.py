@@ -73,3 +73,7 @@ def login_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Ses
         ),
         "token_type": "bearer",
     }
+
+@router.get("/me", response_model=UserInDB)
+def read_users_me(current_user: UserModel = Depends(get_current_user)):
+    return current_user

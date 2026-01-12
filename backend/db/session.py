@@ -1,7 +1,9 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-SQLITE_URL = "sqlite:///./sql_app.db"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SQLITE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'sql_app.db')}"
 # POSTGRES_URL = "postgresql://user:password@postgresserver/db"
 
 engine = create_engine(
