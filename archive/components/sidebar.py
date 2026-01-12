@@ -32,6 +32,8 @@ def render_sidebar(language: str,local_exchange_rate:int, currency_symbol:str ) 
         st.session_state["inverter_cost"] = 3000
     if "installation_cost" not in st.session_state:
         st.session_state["installation_cost"] = 1000
+    if "other_operational_cost" not in st.session_state:
+        st.session_state["other_operational_cost"] = 10
 
     # Simulation Settings
     with st.sidebar.expander(texts["sidebar"]["simulation_settings"], expanded=True):
@@ -69,12 +71,24 @@ def render_sidebar(language: str,local_exchange_rate:int, currency_symbol:str ) 
         
         st.write("Formatted Price:", format_currency(charging_price_local, 1, currency_symbol))
 
+        other_operational_cost_local=st.number_input(
+            texts["sidebar"]["other_operational_cost"],
+            value=st.session_state["other_operational_cost"] * local_rate,
+
+            step=float(1*st.session_state["local_exchange_rate"]),
+            key="other_operational_cost_local",
+            help=texts["sidebar"]["other_operational_cost_help"]
+        )
+        st.session_state["other_operational_cost"] = other_operational_cost_local / local_rate
+
+
+        # display use_battery checkbox
         use_battery = st.checkbox(
             texts["sidebar"]["use_battery"],
             value=True,
             help=texts["sidebar"]["use_battery_help"]
         )
-
+        
     # Solar Settings
     with st.sidebar.expander("Solar Settings", expanded=False):
         solar_capacity = st.number_input(
@@ -196,6 +210,7 @@ def render_sidebar(language: str,local_exchange_rate:int, currency_symbol:str ) 
         )
         st.session_state["installation_cost"] = installation_cost_local / local_rate
 
+        
         charging_station_lifetime = st.number_input(
             texts["sidebar"]["charging_station_lifetime"],
             value=10,
@@ -232,6 +247,7 @@ def render_sidebar(language: str,local_exchange_rate:int, currency_symbol:str ) 
         st.session_state["solar_panel_cost"] = solar_panel_cost_local / local_rate
         st.session_state["inverter_cost"] = inverter_cost_local / local_rate
         st.session_state["installation_cost"] = installation_cost_local / local_rate
+        
 
     # Monte Carlo Simulation Settings
     with st.sidebar.expander(texts["sidebar"]["monte_carlo"], expanded=False):
@@ -352,6 +368,7 @@ def render_sidebar(language: str,local_exchange_rate:int, currency_symbol:str ) 
         "solar_panel_cost": st.session_state["solar_panel_cost"],
         "inverter_cost": st.session_state["inverter_cost"],
         "installation_cost": st.session_state["installation_cost"],
+        "other_operational_cost":st.session_state["other_operational_cost"],
         "charging_station_lifetime": charging_station_lifetime,
         "transformer_lifetime": transformer_lifetime,
         "solar_panel_lifetime": solar_panel_lifetime,

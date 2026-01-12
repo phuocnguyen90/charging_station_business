@@ -1,0 +1,19 @@
+{
+    "Index": {
+        "title": "Solar ROI Calculator",
+        "subtitle": "Calculate your solar savings",
+        "getStarted": "Get Started",
+        "login": "Login"
+    },
+    "Dashboard": {
+        "client": "Client Dashboard",
+        "installer": "Installer Dashboard",
+        "admin": "Admin Dashboard"
+    },
+    "Common": {
+        "submit": "Submit",
+        "cancel": "Cancel",
+        "loading": "Loading...",
+        "language": "Language"
+    }
+}

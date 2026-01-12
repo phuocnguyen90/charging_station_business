@@ -1,0 +1,19 @@
+{
+    "Index": {
+        "title": "Tính Toán ROI Điện Mặt Trời",
+        "subtitle": "Tính toán khoản tiết kiệm năng lượng của bạn",
+        "getStarted": "Bắt Đầu",
+        "login": "Đăng Nhập"
+    },
+    "Dashboard": {
+        "client": "Bảng Điều Khiển Khách Hàng",
+        "installer": "Bảng Điều Khiển Nhà Lắp Đặt",
+        "admin": "Quản Trị Hệ Thống"
+    },
+    "Common": {
+        "submit": "Gửi",
+        "cancel": "Hủy",
+        "loading": "Đang tải...",
+        "language": "Ngôn Ngữ"
+    }
+}

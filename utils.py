@@ -407,7 +407,6 @@ def run_simulation_system(params, ev_demand_generator):
     total_ev_energy = np.sum(demand_arr) 
     
 
-
     return {
         "time_arr": time_arr,
         "battery_soc_arr": battery_soc_arr,
@@ -432,8 +431,8 @@ def get_hourly_details(sim_data):
     """
     df = pd.DataFrame({
         "hour": sim_data["time_arr"] % 24,
-        "ev_demand": sim_data["demand_arr"],
-        "grid_import": sim_data["grid_import_arr"],
+        "ev_demand_rate": sim_data["demand_arr"],
+        "grid_import_rate": sim_data["grid_import_arr"],
         "solar_produced": sim_data["solar_total_arr"],
         "direct_solar": sim_data["solar_used_arr"],
         "battery_discharged": sim_data["battery_discharged_arr"],
@@ -597,6 +596,8 @@ def scale_simulation_results(sim_data, num_stations):
     sim_data["solar_to_battery_arr"] *= num_stations
     sim_data["solar_sold_arr"] *= num_stations
     sim_data["total_ev_energy"] *= num_stations
+    sim_data["cost_grid_arr"] *= num_stations  
+    sim_data["cost_battery_arr"] *= num_stations  
     return sim_data
 
 def simulate_ev_station(params, seed=None):
@@ -663,8 +664,15 @@ def aggregate_results(sim_data, simulation_days):
 
 def annualize_results(sim_results, params):
     total_ev_energy = np.sum(sim_results["demand_arr"])
-    daily_operating_cost = np.sum(sim_results["cost_grid_arr"]) + np.sum(sim_results["cost_battery_arr"])
-    
+
+    other_operational_cost = params.get("other_operational_cost", 0)  # $ per month
+    daily_other_cost = other_operational_cost / 30  # convert to per day
+
+    daily_operating_cost = (
+        np.sum(sim_results["cost_grid_arr"]) * params.get("num_stations")
+        + np.sum(sim_results["cost_battery_arr"]) * params.get("num_stations")
+        + daily_other_cost
+    )        
     annual_energy = total_ev_energy * 365
 
     
@@ -705,12 +713,19 @@ def compute_profit(params, seed=42):
     depreciation of the infrastructure.
     """
     # Run the simulation (already scaled by num_stations)
-    sim_result = simulate_ev_station(params, seed)
+    sim_results = simulate_ev_station(params, seed)
     
     # Calculate daily revenue and operating cost from simulation arrays.
-    daily_revenue = np.sum(sim_result["revenue_arr"])
-    daily_operating_cost = np.sum(sim_result["cost_grid_arr"]) + np.sum(sim_result["cost_battery_arr"])
-    
+    daily_revenue = np.sum(sim_results["revenue_arr"])
+    # Retrieve the additional operational cost (defaulting to 0 if not provided)
+    other_operational_cost = params.get("other_operational_cost", 0)  # $ per month
+    daily_other_cost = other_operational_cost / 30  # convert to per day
+
+    daily_operating_cost = (
+        np.sum(sim_results["cost_grid_arr"]) * params.get("num_stations")
+        + np.sum(sim_results["cost_battery_arr"]) * params.get("num_stations")
+        + daily_other_cost
+    )    
     # Daily profit is revenue minus operating cost.
     daily_profit = daily_revenue - daily_operating_cost
     
