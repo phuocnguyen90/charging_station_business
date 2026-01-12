@@ -38,5 +38,17 @@ A comprehensive web application for estimating Solar Energy potential, Return on
    ```
    Access at `http://localhost:3001` (if 3000 is taken).
 
+## Running via Docker
+
+To spin up the entire stack with a single command (ensure you stop any local instances first):
+
+```bash
+docker-compose up --build
+```
+
+- **Frontend**: http://localhost:3001
+- **Backend API**: http://localhost:5001
+- **API Docs**: http://localhost:5001/api/v1/docs
+
 ## Documentation
 See `AGENTS.md` for architectural details and agent handover context.

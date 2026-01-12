@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  backend:
+    build: 
+      context: ./backend
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./backend:/app
+      # Exclude venv and pycache to use container's environment
+      - /app/venv
+      - /app/__pycache__
+    environment:
+      - PROJECT_NAME=Solar ROI API
+      # Allow requests from frontend container and host
+      - BACKEND_CORS_ORIGINS=["http://localhost:3000","http://localhost:3001","http://localhost:5001"]
+    command: uvicorn main:app --host 0.0.0.0 --port 5001 --reload
+
+  frontend:
+    build: 
+      context: ./frontend
+    ports:
+      - "3001:3001"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:5001/api/v1
+    # Mount source for dev reloading (optional, might need next.config tuning)
+    # volumes:
+    #   - ./frontend:/app
+    #   - /app/node_modules
+    #   - /app/.next
+    depends_on:
+      - backend
+
+# Note: Using SQLite mapped via volume in 'backend' service above.
